@@ -1,4 +1,4 @@
-﻿package com.koreatech.cse.termproject;
+package com.koreatech.cse.termproject;
 
 import android.app.Service;
 import android.content.Context;
@@ -66,6 +66,7 @@ public class StepMonitor extends Service implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
+        Log.d("sdf*****sdf", "fdfsf****************************");
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
 
             currT = event.timestamp;
@@ -86,7 +87,7 @@ public class StepMonitor extends Service implements SensorEventListener {
         double rms = Math.sqrt(values[0] * values[0] + values[1] * values[1] + values[2] * values[2]);
 
         //MainActivity.rmsText.append(rms + "\n");
-        //Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
+        Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
 
         if(rmsCount < NUMBER_OF_SAMPLES) {
             // sampling

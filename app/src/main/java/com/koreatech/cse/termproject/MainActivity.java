@@ -1,4 +1,4 @@
-﻿package com.koreatech.cse.termproject;
+package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.Activity;
@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -212,15 +213,18 @@ public class MainActivity extends Activity implements View.OnClickListener {
             try {
                 output = new FileOutputStream(f,true);
                 Writer out = new OutputStreamWriter(output, "UTF8");
-
                 Date date = new Date();
+
                 long distantTime = (date.getTime()-date.getTime()) / 1000;
                 distantTime = (distantTime / 60);
+
                 out.write(beforeDate.getHours()+":"+beforeDate.getMinutes() +"-"+ date.getHours()+":"+date.getMinutes() + " "+distantTime +"분 " + (isIndoor ? "실내\n" : "실외\n"));
                 beforeDate = date;
                 out.close();
+
                 inputStream = new FileInputStream(f);
                 byte[] buffer=new byte[inputStream.available()];
+
                 inputStream.read(buffer);
                 logText.setText(new String(buffer));
                 inputStream.close();
