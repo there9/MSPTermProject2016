@@ -5,11 +5,19 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context="com.koreatech.cse.termproject.MainActivity">
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Date"
+        android:textSize="20dp"
+        android:background="#ffff33"
+        android:id="@+id/todayTextView"
+        />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="40dp"
         android:gravity="center"
         android:background="#00ff99">
         <TextView
@@ -18,7 +26,7 @@
             android:text="Summary Step"
             android:textSize="20dp"
             android:layout_marginBottom="5dp"
-            android:id="@+id/Summary_Step_Text"
+            android:id="@+id/summaryStepText"
             />
         <TextView
             android:layout_width="wrap_content"
@@ -26,13 +34,13 @@
             android:layout_marginBottom="5dp"
             android:text="TotalStep Time"
             android:textSize="20dp"
-            android:id="@+id/TotalStep_Time_Text"/>
+            android:id="@+id/totalStepTimeText"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Maximun Location"
             android:textSize="20dp"
-            android:id="@+id/Maximun_Location_Text"/>
+            android:id="@+id/maximunLocationText"/>
     </LinearLayout>
     <TextView
         android:layout_width="match_parent"

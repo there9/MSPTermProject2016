@@ -28,20 +28,32 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity implements View.OnClickListener, SensorEventListener {
     final String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject";
 
-    TextView summaryStepText, logText, totalStepTimeText, maximunLocationText;
+    // UI 관련
+    TextView todayText;
+    TextView summaryStepText;
+    TextView totalStepTimeText;
+    TextView maximunLocationText;
+    TextView logText;
+
+    // 센서 관련
     LocationManager locationManager;
     LocationProvider locationProvider;
     SensorManager sensorManager;
+    Sensor accelerometerSensor;
     WifiManager wifiManager;
 
-    Sensor accelerometerSensor, lightSensor;
+    // 정해진 위치 정보
+    Location sportGroundLocation;
+    Location universityMainLocation;
 
     // TODO 코드 정리 필요
     Toast toast;
@@ -51,7 +63,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
     BroadcastReceiver alarmBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            //wifiManager.startScan();
+            wifiManager.startScan();
         }
     };
 
@@ -81,11 +93,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
                     }
                 }
             }
-            //toast.cancel();
-            toast.setText(isIndoor ? "실내" : "실외");
-            toast.show();
 
-            logText.setText(str);
+            logText.setText(isIndoor ? "실내" : "실외");
         }
     };
 
@@ -102,16 +111,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
             String str = "";
             for(GpsSatellite gpsSatellite : gpsSatellites) {
                 count++;
-                if(gpsSatellite.usedInFix())
+                //if(gpsSatellite.usedInFix())
                     str += gpsSatellite.toString() + "\n";
             }
 
             logText.setText(str);
-
-            //toast.cancel();
-            toast.setText("위성수: " +  count);
+            //logText.setText("위성수: " +  count);
             //toast.setText((count > 5 ? "실외" : "실내") + " " + count);
-            toast.show();
+            //toast.show();
         }
     };
 
@@ -144,29 +151,43 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
         // 센서 관련
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
         locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
 
-        // UI 관련
-        summaryStepText = (TextView) findViewById(R.id.Summary_Step_Text);
-        logText = (TextView) findViewById(R.id.logText);
-        totalStepTimeText = (TextView) findViewById(R.id.TotalStep_Time_Text);
-        maximunLocationText = (TextView) findViewById(R.id.Maximun_Location_Text);
+        wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        // TODO 코드 정리 필요
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+
+        // UI 관련
+        todayText = (TextView) findViewById(R.id.todayTextView);
+        summaryStepText = (TextView) findViewById(R.id.summaryStepText);
+        totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
+        maximunLocationText = (TextView) findViewById(R.id.maximunLocationText);
+        logText = (TextView) findViewById(R.id.logText);
+
+        todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
         logText.setMovementMethod(new ScrollingMovementMethod());
 
+
+        // 정해진 위치 정보
+        sportGroundLocation = new Location("");
+        universityMainLocation = new Location("");
+
+        sportGroundLocation.setLatitude(36.762581);
+        sportGroundLocation.setLongitude(127.284527);
+        universityMainLocation.setLatitude(36.764215);
+        universityMainLocation.setLongitude(127.282173);
+
+
+        // TODO 코드 정리 필요
         toast = Toast.makeText(getApplicationContext(), "", Toast.LENGTH_SHORT);
 
-        final Intent alramIntent = new Intent(ALARM_BROADCAST_TAG);
-        alarmPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, alramIntent, 0);
+        final Intent alarmIntent = new Intent(ALARM_BROADCAST_TAG);
+        alarmPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, alarmIntent, 0);
 
         Intent wifiIntent = new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         wifiPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, wifiIntent, 0);
-
     }
 
     protected void onDestory() {
@@ -177,8 +198,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
     protected void onResume() {
         super.onResume();
 
-        sensorManager.registerListener(this, lightSensor, SensorManager.SENSOR_DELAY_UI);
         sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
+
 
         // TODO 코드 정리 필요
         alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
@@ -187,16 +208,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
         IntentFilter alarmFilter = new IntentFilter(ALARM_BROADCAST_TAG);
         registerReceiver(alarmBroadcastReceiver, alarmFilter);
 
-        //IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
-        //registerReceiver(wifiBroadcastReceiver, wifiFilter);
+        IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+        registerReceiver(wifiBroadcastReceiver, wifiFilter);
 
-        //wifiManager.startScan();
+        wifiManager.startScan();
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        locationManager.addGpsStatusListener(gpsStatuslistener);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
+        //locationManager.addGpsStatusListener(gpsStatuslistener);
+        //locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
     }
     @Override
     protected void onPause() {
@@ -204,17 +225,18 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
         sensorManager.unregisterListener(this);
 
+
         // TODO 코드 정리 필요
         unregisterReceiver(alarmBroadcastReceiver);
         alarmManager.cancel(alarmPendingIntent);
 
-        //unregisterReceiver(wifiBroadcastReceiver);
+        unregisterReceiver(wifiBroadcastReceiver);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        locationManager.removeGpsStatusListener(gpsStatuslistener);
-        locationManager.removeUpdates(locationListener);
+        //locationManager.removeGpsStatusListener(gpsStatuslistener);
+        //locationManager.removeUpdates(locationListener);
     }
 
     @Override
