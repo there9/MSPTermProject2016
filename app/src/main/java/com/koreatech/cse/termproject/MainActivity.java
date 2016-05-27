@@ -26,7 +26,6 @@ import android.support.v4.app.ActivityCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -41,7 +40,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
     TextView todayText;
     TextView summaryStepText;
     TextView totalStepTimeText;
-    TextView maximunLocationText;
+    TextView maximumLocationText;
     TextView logText;
 
     // 센서 관련
@@ -56,8 +55,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
     Location universityMainLocation;
 
     // TODO 코드 정리 필요
-    Toast toast;
-
     AlarmManager alarmManager;
     PendingIntent alarmPendingIntent;
     BroadcastReceiver alarmBroadcastReceiver = new BroadcastReceiver() {
@@ -94,11 +91,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
                 }
             }
 
-            logText.setText(isIndoor ? "실내" : "실외");
+            logText.setText((isIndoor ? "실내" : "실외") + "\n" + str);
         }
     };
 
-    GpsStatus.Listener gpsStatuslistener = new GpsStatus.Listener() {
+    GpsStatus.Listener gpsStatusListener = new GpsStatus.Listener() {
         @Override
         public void onGpsStatusChanged(int event) {
             if(event != GpsStatus.GPS_EVENT_SATELLITE_STATUS)
@@ -112,13 +109,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
             for(GpsSatellite gpsSatellite : gpsSatellites) {
                 count++;
                 //if(gpsSatellite.usedInFix())
-                    str += gpsSatellite.toString() + "\n";
+                    str += "[" + count + "] " + gpsSatellite.toString() + "\n";
             }
 
             logText.setText(str);
-            //logText.setText("위성수: " +  count);
-            //toast.setText((count > 5 ? "실외" : "실내") + " " + count);
-            //toast.show();
         }
     };
 
@@ -163,7 +157,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
         todayText = (TextView) findViewById(R.id.todayTextView);
         summaryStepText = (TextView) findViewById(R.id.summaryStepText);
         totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
-        maximunLocationText = (TextView) findViewById(R.id.maximunLocationText);
+        maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
         logText = (TextView) findViewById(R.id.logText);
 
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
@@ -181,8 +175,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
 
         // TODO 코드 정리 필요
-        toast = Toast.makeText(getApplicationContext(), "", Toast.LENGTH_SHORT);
-
         final Intent alarmIntent = new Intent(ALARM_BROADCAST_TAG);
         alarmPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, alarmIntent, 0);
 
@@ -216,7 +208,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        //locationManager.addGpsStatusListener(gpsStatuslistener);
+        //locationManager.addGpsStatusListener(gpsStatusListener);
         //locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
     }
     @Override
@@ -235,7 +227,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        //locationManager.removeGpsStatusListener(gpsStatuslistener);
+        //locationManager.removeGpsStatusListener(gpsStatusListener);
         //locationManager.removeUpdates(locationListener);
     }
 
