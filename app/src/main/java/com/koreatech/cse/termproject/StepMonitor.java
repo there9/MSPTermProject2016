@@ -1,4 +1,4 @@
-package com.koreatech.cse.termproject;
+﻿package com.koreatech.cse.termproject;
 
 import android.app.Service;
 import android.content.Context;
@@ -127,3 +127,4 @@ public class StepMonitor extends Service implements SensorEventListener {
 
     }
 }
+
