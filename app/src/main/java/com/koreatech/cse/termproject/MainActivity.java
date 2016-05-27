@@ -63,18 +63,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
     // 정해진 위치 정보
     Location sportGroundLocation;
     Location universityMainLocation;
-
-    // TODO 코드 정리 필요
-
-    Toast toast;
-    AlarmManager alarmManager;
-    PendingIntent alarmPendingIntent;
-    BroadcastReceiver alarmBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            wifiManager.startScan();
-        }
-    };
     PendingIntent wifiPendingIntent;
 
     String path = Environment.getExternalStorageDirectory().getAbsolutePath();
@@ -166,71 +154,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) {
-
-
-
-    PendingIntent wifiPendingIntent;
-    BroadcastReceiver wifiBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            List<ScanResult> scanResultList;
-            scanResultList = wifiManager.getScanResults();
-
-            Collections.sort(scanResultList, new Comparator<ScanResult>() {
-                @Override
-                public int compare(ScanResult lhs, ScanResult rhs) {
-                    return rhs.level - lhs.level;
-                }
-            });
-
-            boolean isIndoor = false;
-            String str = "";
-            for (ScanResult scanResult : scanResultList) {
-                str += scanResult.SSID + "\n";
-                str += "  BSSID: " + scanResult.BSSID + "\n";
-                str += "  Level: " + scanResult.level + "\n\n";
-                if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
-                    if (scanResult.level > -50) {
-                        isIndoor = true;
-                    }
-                }
-            }
-
-            logText.setText((isIndoor ? "실내" : "실외") + "\n" + str);
-        }
-    };
-
-    GpsStatus.Listener gpsStatusListener = new GpsStatus.Listener() {
-        @Override
-        public void onGpsStatusChanged(int event) {
-            if(event != GpsStatus.GPS_EVENT_SATELLITE_STATUS)
-                return;
-
-            GpsStatus gpsStatus = locationManager.getGpsStatus(null);
-            Iterable<GpsSatellite> gpsSatellites = gpsStatus.getSatellites();
-
-            int count = 0;
-            String str = "";
-            for(GpsSatellite gpsSatellite : gpsSatellites) {
-                count++;
-                //if(gpsSatellite.usedInFix())
-                    str += "[" + count + "] " + gpsSatellite.toString() + "\n";
-            }
-
-            logText.setText(str);
-        }
-    };
-
-    LocationListener locationListener = new LocationListener() {
-        @Override
-        public void onLocationChanged(Location location) {
-
-        }
-
-        @Override
-        public void onStatusChanged(String provider, int status, Bundle extras) {
-
-        }
+	}
 
         @Override
         public void onProviderEnabled(String provider) {
@@ -280,8 +204,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
 
         // TODO 코드 정리 필요
-
-
         final Intent alarmIntent = new Intent(ALARM_BROADCAST_TAG);
         alarmPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, alarmIntent, 0);
 
@@ -306,7 +228,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
         IntentFilter alarmFilter = new IntentFilter(ALARM_BROADCAST_TAG);
         registerReceiver(alarmBroadcastReceiver, alarmFilter);
-
         IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         registerReceiver(wifiBroadcastReceiver, wifiFilter);
 
@@ -322,14 +243,6 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
         IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         registerReceiver(wifiBroadcastReceiver, wifiFilter);
 
-        wifiManager.startScan();
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        //locationManager.addGpsStatusListener(gpsStatusListener);
-        //locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
-
     }
     @Override
     protected void onPause() {
@@ -337,14 +250,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Sens
 
         sensorManager.unregisterListener(this);
 
-
-
         // TODO 코드 정리 필요
         unregisterReceiver(alarmBroadcastReceiver);
         alarmManager.cancel(alarmPendingIntent);
 
         unregisterReceiver(wifiBroadcastReceiver);
-
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
