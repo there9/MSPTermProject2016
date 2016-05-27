@@ -1,4 +1,4 @@
-package com.example.user.myapplication;
+package com.koreatech.cse.termproject;
 
 /**
  * Created by HOME on 2016-05-27.
