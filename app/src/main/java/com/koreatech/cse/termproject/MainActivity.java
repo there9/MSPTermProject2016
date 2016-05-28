@@ -45,7 +45,7 @@ import java.util.List;
 
 public class MainActivity extends Activity implements View.OnClickListener, SensorEventListener {
     final String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject";
-
+	//
     // UI 관련
     TextView todayText;
     TextView summaryStepText;
