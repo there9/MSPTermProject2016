@@ -148,6 +148,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onResume();
 
         // Alarm setting
+        // TODO, BUG 종료시 crash 처리
         alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
 
@@ -170,6 +171,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         //stopService(new Intent(this, StepMonitor.class));
 
         // alarm clean
+        // TODO, BUG 종료시 crash 처리
         unregisterReceiver(alarmBroadcastReceiver);
         alarmManager.cancel(alarmPendingIntent);
 
@@ -186,6 +188,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         wifiManager.startScan();
     }
     public void cleanWifiScan() {
+        // TODO, BUG 종료시 crash 처리
         unregisterReceiver(wifiBroadcastReceiver);
     }
 
@@ -198,6 +201,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
     }
     public void cleanGpsScan() {
+        // TODO, BUG 종료시 crash 처리
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -283,6 +287,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
+
+
+            // TODO!!! GPS 로 넘어가는거 구현
         }
     }
 
@@ -311,7 +318,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
                     return;
                 }
                 // 실내
-                // TODO
                 Toast.makeText(getApplicationContext(), "GPS 꺼짐", Toast.LENGTH_SHORT).show();
                 cleanGpsScan();
                 setupWifiScan();
