@@ -1,4 +1,4 @@
-﻿package com.koreatech.cse.termproject;
+package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.Activity;
@@ -24,12 +24,15 @@ import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -52,14 +55,22 @@ public class MainActivity extends Activity implements View.OnClickListener {
     LocationProvider locationProvider;
     WifiManager wifiManager;
 
+    // GPS 관련
+    long gpsStartTime;
+    final int GPS_WAIT_MILLIS = 8000;
+
+    double latitude;
+    double longtitude;
+
     // 정해진 위치 정보
     Location sportGroundLocation;
     Location universityMainLocation;
 
+    // 로그 관련
     String path = Environment.getExternalStorageDirectory().getAbsolutePath();
-    File f = new File(path +"/wifiLog.txt");
-    FileOutputStream output = null;
-    FileInputStream inputStream = null;
+    File logFile = new File(path + "/log.txt");
+    OutputStreamWriter logWriter;
+    FileInputStream logInputStream;
     Date beforeDate = new Date();
 
     // Alarm broadcast
@@ -94,6 +105,16 @@ public class MainActivity extends Activity implements View.OnClickListener {
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
         logText = (TextView) findViewById(R.id.logText);
 
+        // 로그 관련
+        try {
+            logWriter = new OutputStreamWriter(new FileOutputStream(logFile, true), "UTF8");
+            logInputStream = new FileInputStream(logFile);
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
         logText.setMovementMethod(new ScrollingMovementMethod());
 
@@ -113,6 +134,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     protected void onDestroy() {
+        try {
+            logWriter.close();
+            logInputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         super.onDestroy();
     }
 
@@ -125,42 +152,87 @@ public class MainActivity extends Activity implements View.OnClickListener {
         alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
 
         // Step Monitor
-        registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
-        startService(new Intent(this, StepMonitor.class));
+        //registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
+        //startService(new Intent(this, StepMonitor.class));
 
         // Wifi scan setting
-        //registerReceiver(alarmBroadcastReceiver, new IntentFilter(ALARM_BROADCAST_TAG));
-        //registerReceiver(wifiBroadcastReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-        //wifiManager.startScan();
+        //setupWifiScan();
 
         // GPS status setting
-        //if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        //    return;
-        //}
-        //locationManager.addGpsStatusListener(gpsStatusListener);
-        //locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
+        setupGpsScan();
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         // step monitor stop
-        unregisterReceiver(stepBroadcastReceiver);
-        stopService(new Intent(this, StepMonitor.class));
+        //unregisterReceiver(stepBroadcastReceiver);
+        //stopService(new Intent(this, StepMonitor.class));
 
         // alarm clean
-        //unregisterReceiver(alarmBroadcastReceiver);
-        //alarmManager.cancel(alarmPendingIntent);
+        unregisterReceiver(alarmBroadcastReceiver);
+        alarmManager.cancel(alarmPendingIntent);
 
         // wifi clean
-        //unregisterReceiver(wifiBroadcastReceiver);
+        cleanWifiScan();
 
         // GPS clean
-        //if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        //    return;
-        //}
-        //locationManager.removeGpsStatusListener(gpsStatusListener);
-        //locationManager.removeUpdates(locationListener);
+        cleanGpsScan();
+    }
+
+    public void setupWifiScan() {
+        registerReceiver(alarmBroadcastReceiver, new IntentFilter(ALARM_BROADCAST_TAG));
+        registerReceiver(wifiBroadcastReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        wifiManager.startScan();
+    }
+    public void cleanWifiScan() {
+        unregisterReceiver(wifiBroadcastReceiver);
+    }
+
+    public void setupGpsScan() {
+        gpsStartTime = System.currentTimeMillis();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locationManager.addGpsStatusListener(gpsStatusListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
+    }
+    public void cleanGpsScan() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locationManager.removeGpsStatusListener(gpsStatusListener);
+        locationManager.removeUpdates(locationListener);
+    }
+
+    public void appendLog() {
+        try {
+            Date date = new Date();
+            long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
+
+            logWriter.write(
+                    beforeDate.getHours() + ":" +
+                            beforeDate.getMinutes() + "-" +
+                            date.getHours() + ":" +
+                            date.getMinutes() + " " +
+                            distantTime +"분 "
+            );
+            beforeDate = new Date();
+
+            readUpdateLog();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void readUpdateLog() {
+        try {
+            byte[] buffer = new byte[logInputStream.available()];
+            logInputStream.read(buffer);
+
+            logText.setText(buffer + "");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -188,6 +260,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
             List<ScanResult> scanResultList;
             scanResultList = wifiManager.getScanResults();
 
+            Toast.makeText(getApplicationContext(), "와이파이 스켄..", Toast.LENGTH_SHORT).show();
+
             Collections.sort(scanResultList, new Comparator<ScanResult>() {
                 @Override
                 public int compare(ScanResult lhs, ScanResult rhs) {
@@ -202,36 +276,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 str += "  BSSID: " + scanResult.BSSID + "\n";
                 str += "  Level: " + scanResult.level + "\n\n";
                 if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
-                    if (scanResult.level > -50) {
+                    if (scanResult.level > -55) {
                         isIndoor = true;
                     }
                 }
             }
 
-            logText.setText((isIndoor ? "실내" : "실외") + "\n" + str);
-
-            try {
-                output = new FileOutputStream(f,true);
-                Writer out = new OutputStreamWriter(output, "UTF8");
-                Date date = new Date();
-
-                long distantTime = (date.getTime()-date.getTime()) / 1000;
-                distantTime = (distantTime / 60);
-
-                out.write(beforeDate.getHours()+":"+beforeDate.getMinutes() +"-"+ date.getHours()+":"+date.getMinutes() + " "+distantTime +"분 " + (isIndoor ? "실내\n" : "실외\n"));
-                beforeDate = date;
-                out.close();
-
-                inputStream = new FileInputStream(f);
-                byte[] buffer=new byte[inputStream.available()];
-
-                inputStream.read(buffer);
-                logText.setText(new String(buffer));
-                inputStream.close();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
         }
     }
 
@@ -247,17 +298,31 @@ public class MainActivity extends Activity implements View.OnClickListener {
             int count = 0;
             String str = "";
             for(GpsSatellite gpsSatellite : gpsSatellites) {
-                count++;
-                //if(gpsSatellite.usedInFix())
-                str += "[" + count + "] " + gpsSatellite.toString() + "\n";
+                if(gpsSatellite.usedInFix()) {
+                    count++;
+                    //str += "[" + count + "] " + gpsSatellite.toString() + "\n";
+                }
             }
 
-            logText.setText(str);
+            if(count > 5) {
+                logText.setText("GPS>> 실외판정됨.");
+            } else {
+                if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
+                    return;
+                }
+                // 실내
+                // TODO
+                Toast.makeText(getApplicationContext(), "GPS 꺼짐", Toast.LENGTH_SHORT).show();
+                cleanGpsScan();
+                setupWifiScan();
+            }
+
+            //Toast.makeText(getApplicationContext(), count, Toast.LENGTH_SHORT).show();
+
+            logText.setText(count + "");
         }
     }
 
-    double latitude;
-    double longtitude;
     class LocationListener implements android.location.LocationListener {
         @Override
         public void onLocationChanged(Location location) {

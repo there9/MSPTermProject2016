@@ -7,7 +7,7 @@ public class LocationInfo {
     static int totalStepCount;
     static int totalMovingTime;
 
-    LocationInfo(String locationName, int step, float time) {
+    public LocationInfo(String locationName, int step, float time) {
         this.locationName = locationName;
         this.step = step;
         this.time = time;
