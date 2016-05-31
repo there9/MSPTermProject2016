@@ -10,6 +10,7 @@ import android.hardware.SensorManager;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
+import android.widget.Toast;
 
 public class StepMonitor extends Service implements SensorEventListener {
     public final static String STEP_BROADCAST_TAG = "com.koreatech.cse.termproject.step_scan";
@@ -30,7 +31,8 @@ public class StepMonitor extends Service implements SensorEventListener {
     private static final int NUMBER_OF_SAMPLES = 5;
     private static final double AVG_RMS_THRESHOLD = 2.5;
     private static final double NUMBER_OF_STEPS_PER_SEC = 1.5;
-
+    long cureentTime;
+    long endTime;
     @Override
     public void onCreate() {
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -44,10 +46,13 @@ public class StepMonitor extends Service implements SensorEventListener {
         powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "step");
         wakeLock.acquire();
+
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        cureentTime = System.currentTimeMillis();
+        Log.d("aaAAA","aaAAA");
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -77,24 +82,36 @@ public class StepMonitor extends Service implements SensorEventListener {
             float[] values = event.values.clone();
 
             computeSteps(values);
+
         }
     }
-
+    private static final int MINUTE_PER_MAXIMUN_STEP = 15;
+    private static final int ONE_MINUTE_COUNT = 10;
+    int minute_count=0;
     private void computeSteps(float[] values) {
         double avgRms = 0;
 
+        if(minute_count>ONE_MINUTE_COUNT) {
+            if (steps < MINUTE_PER_MAXIMUN_STEP ) {
+                Toast.makeText(getApplicationContext(), "움직이지 않음", Toast.LENGTH_SHORT).show();
+            } else{
+                Toast.makeText(getApplicationContext(), steps+"", Toast.LENGTH_SHORT).show();
+            }
+            minute_count = 0;
+            steps =0;
+        }
         // X, Y, Z 축 RMS값
         double rms = Math.sqrt(values[0] * values[0] + values[1] * values[1] + values[2] * values[2]);
 
         //MainActivity.rmsText.append(rms + "\n");
-        Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
+       // Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
 
         if(rmsCount < NUMBER_OF_SAMPLES) {
             // sampling
             rmsArray[rmsCount] = rms;
             rmsCount++;
         } else {
-            // calculate
+
             double sum = 0;
             for(double e : rmsArray) {
                 sum += e;
@@ -102,14 +119,16 @@ public class StepMonitor extends Service implements SensorEventListener {
 
             avgRms = sum / NUMBER_OF_SAMPLES;
             Log.d(LOGTAG, "1sec avg rms: " + avgRms);
-
+            minute_count++;
+            Toast.makeText(getApplicationContext(), minute_count+"", Toast.LENGTH_SHORT).show();
             // step result
             if(avgRms > AVG_RMS_THRESHOLD) {
                 steps += NUMBER_OF_STEPS_PER_SEC;
+
                 Log.d(LOGTAG, "steps: " + steps);
 
                 Intent intent = new Intent(STEP_BROADCAST_TAG);
-                intent.putExtra("steps", (int)steps);
+                intent.putExtra("steps", (int) steps);
                 sendBroadcast(intent);
             }
 
