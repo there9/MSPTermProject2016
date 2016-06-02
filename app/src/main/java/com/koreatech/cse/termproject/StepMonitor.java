@@ -71,40 +71,42 @@ public class StepMonitor extends Service implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        Log.d("sdf*****sdf", "fdfsf****************************");
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
 
             currT = event.timestamp;
             double dt = (currT - prevT) / 1000000;
             //Log.d(LOGTAG, "time difference=" + dt);
             prevT = currT;
-
+            minute_count++;
+            //Log.d(LOGTAG, minute_count+"");
             float[] values = event.values.clone();
 
             computeSteps(values);
 
         }
     }
-    private static final int MINUTE_PER_MAXIMUN_STEP = 15;
-    private static final int ONE_MINUTE_COUNT = 10;
-    int minute_count=0;
+    private static final int MINUTE_PER_MAXIMUN_STEP = 80;
+    private static final int ONE_MINUTE_COUNT = 900;
+    private int minute_count=0;
+    Intent intent = new Intent("No Moving Arlam");
     private void computeSteps(float[] values) {
         double avgRms = 0;
 
         if(minute_count>ONE_MINUTE_COUNT) {
             if (steps < MINUTE_PER_MAXIMUN_STEP ) {
-                Toast.makeText(getApplicationContext(), "움직이지 않음", Toast.LENGTH_SHORT).show();
-            } else{
-                Toast.makeText(getApplicationContext(), steps+"", Toast.LENGTH_SHORT).show();
+                //1분간 걸음수를 채우지 못함.
+                intent.putExtra("isMoving",true);
+                intent.putExtra("steps", (int) steps);
+                sendBroadcast(intent);
+                steps =0;
             }
             minute_count = 0;
-            steps =0;
         }
-        // X, Y, Z 축 RMS값
+        // X, Y, Z
         double rms = Math.sqrt(values[0] * values[0] + values[1] * values[1] + values[2] * values[2]);
 
         //MainActivity.rmsText.append(rms + "\n");
-       // Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
+        // Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
 
         if(rmsCount < NUMBER_OF_SAMPLES) {
             // sampling
@@ -119,17 +121,17 @@ public class StepMonitor extends Service implements SensorEventListener {
 
             avgRms = sum / NUMBER_OF_SAMPLES;
             Log.d(LOGTAG, "1sec avg rms: " + avgRms);
-            minute_count++;
-            Toast.makeText(getApplicationContext(), minute_count+"", Toast.LENGTH_SHORT).show();
+
+
             // step result
             if(avgRms > AVG_RMS_THRESHOLD) {
                 steps += NUMBER_OF_STEPS_PER_SEC;
 
                 Log.d(LOGTAG, "steps: " + steps);
 
-                Intent intent = new Intent(STEP_BROADCAST_TAG);
-                intent.putExtra("steps", (int) steps);
-                sendBroadcast(intent);
+                //Intent intent = new Intent(STEP_BROADCAST_TAG);
+
+                //sendBroadcast(intent);
             }
 
             // clear

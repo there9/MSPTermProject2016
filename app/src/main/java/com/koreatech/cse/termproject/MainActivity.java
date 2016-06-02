@@ -43,30 +43,30 @@ import java.util.List;
 public class MainActivity extends Activity implements View.OnClickListener {
     public final static String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject.alarm";
 
-    // UI Í¥ÄÎ†®
+    // UI ∞¸∑√
     TextView todayText;
     TextView summaryStepText;
     TextView totalStepTimeText;
     TextView maximumLocationText;
     TextView logText;
 
-    // ÏÑºÏÑú Í¥ÄÎ†®
+    // ºæº≠ ∞¸∑√
     LocationManager locationManager;
     LocationProvider locationProvider;
     WifiManager wifiManager;
 
-    // GPS Í¥ÄÎ†®
+    // GPS ∞¸∑√
     long gpsStartTime;
     final int GPS_WAIT_MILLIS = 8000;
 
     double latitude;
     double longtitude;
 
-    // Ï†ïÌï¥ÏßÑ ÏúÑÏπò Ï†ïÎ≥¥
+    // ¡§«ÿ¡¯ ¿ßƒ° ¡§∫∏
     Location sportGroundLocation;
     Location universityMainLocation;
 
-    // Î°úÍ∑∏ Í¥ÄÎ†®
+    // ∑Œ±◊ ∞¸∑√
     String path = Environment.getExternalStorageDirectory().getAbsolutePath();
     File logFile = new File(path + "/log.txt");
     OutputStreamWriter logWriter;
@@ -93,19 +93,23 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // ÏÑºÏÑú Í¥ÄÎ†®
+
+
+
+
+        // ºæº≠ ∞¸∑√
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        // UI Í¥ÄÎ†®
+        // UI ∞¸∑√
         todayText = (TextView) findViewById(R.id.todayTextView);
         summaryStepText = (TextView) findViewById(R.id.summaryStepText);
         totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
         logText = (TextView) findViewById(R.id.logText);
 
-        // Î°úÍ∑∏ Í¥ÄÎ†®
+        // ∑Œ±◊ ∞¸∑√
         try {
             logWriter = new OutputStreamWriter(new FileOutputStream(logFile, true), "UTF8");
             logInputStream = new FileInputStream(logFile);
@@ -115,11 +119,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
             e.printStackTrace();
         }
 
-        todayText.setText((new SimpleDateFormat("yyyyÎÖÑ MÏõî ddÏùº", java.util.Locale.getDefault()).format(new Date())));
+        todayText.setText((new SimpleDateFormat("yyyy≥‚ Mø˘ dd¿œ", java.util.Locale.getDefault()).format(new Date())));
         logText.setMovementMethod(new ScrollingMovementMethod());
 
 
-        // Ï†ïÌï¥ÏßÑ ÏúÑÏπò Ï†ïÎ≥¥
+        // ¡§«ÿ¡¯ ¿ßƒ° ¡§∫∏
         sportGroundLocation = new Location("");
         universityMainLocation = new Location("");
 
@@ -148,13 +152,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onResume();
 
         // Alarm setting
-        // TODO, BUG Ï¢ÖÎ£åÏãú crash Ï≤òÎ¶¨
+        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
         alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
 
         // Step Monitor
-        //registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
-        //startService(new Intent(this, StepMonitor.class));
+        registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
+        startService(new Intent(this, StepMonitor.class));
 
         // Wifi scan setting
         //setupWifiScan();
@@ -167,11 +171,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onPause();
 
         // step monitor stop
-        //unregisterReceiver(stepBroadcastReceiver);
-        //stopService(new Intent(this, StepMonitor.class));
+        unregisterReceiver(stepBroadcastReceiver);
+        stopService(new Intent(this, StepMonitor.class));
 
         // alarm clean
-        // TODO, BUG Ï¢ÖÎ£åÏãú crash Ï≤òÎ¶¨
+        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
         unregisterReceiver(alarmBroadcastReceiver);
         alarmManager.cancel(alarmPendingIntent);
 
@@ -188,7 +192,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         wifiManager.startScan();
     }
     public void cleanWifiScan() {
-        // TODO, BUG Ï¢ÖÎ£åÏãú crash Ï≤òÎ¶¨
+        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
         unregisterReceiver(wifiBroadcastReceiver);
     }
 
@@ -201,7 +205,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
     }
     public void cleanGpsScan() {
-        // TODO, BUG Ï¢ÖÎ£åÏãú crash Ï≤òÎ¶¨
+        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -219,7 +223,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
                             beforeDate.getMinutes() + "-" +
                             date.getHours() + ":" +
                             date.getMinutes() + " " +
-                            distantTime +"Î∂Ñ "
+                            distantTime +"∫– "
             );
             beforeDate = new Date();
 
@@ -254,7 +258,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
     class StepBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            logText.setText("STEP: " + intent.getIntExtra("steps", 0));
+            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -264,7 +269,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             List<ScanResult> scanResultList;
             scanResultList = wifiManager.getScanResults();
 
-            Toast.makeText(getApplicationContext(), "ÏôÄÏù¥ÌååÏù¥ Ïä§ÏºÑ..", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), "øÕ¿Ã∆ƒ¿Ã Ω∫ƒÀ..", Toast.LENGTH_SHORT).show();
 
             Collections.sort(scanResultList, new Comparator<ScanResult>() {
                 @Override
@@ -286,10 +291,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 }
             }
 
-            logText.setText((isIndoor ? "ÌòÑÏû¨ÏúÑÏπò: MCNÎû©" : "ÌòÑÏû¨ÏúÑÏπò: Î™®Î•¥Îäî Ïã§ÎÇ¥") + "\n" + str);
+            logText.setText((isIndoor ? "«ˆ¿Á¿ßƒ°: MCN∑¶" : "«ˆ¿Á¿ßƒ°: ∏∏£¥¬ Ω«≥ª") + "\n" + str);
 
 
-            // TODO!!! GPS Î°ú ÎÑòÏñ¥Í∞ÄÎäîÍ±∞ Íµ¨ÌòÑ
+            // TODO!!! GPS ∑Œ ≥—æÓ∞°¥¬∞≈ ±∏«ˆ
         }
     }
 
@@ -312,13 +317,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             if(count > 5) {
-                logText.setText("GPS>> Ïã§Ïô∏ÌåêÏ†ïÎê®.");
+                logText.setText("GPS>> Ω«ø‹∆«¡§µ .");
             } else {
                 if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
                     return;
                 }
-                // Ïã§ÎÇ¥
-                Toast.makeText(getApplicationContext(), "GPS Í∫ºÏßê", Toast.LENGTH_SHORT).show();
+                // Ω«≥ª
+                Toast.makeText(getApplicationContext(), "GPS ≤®¡¸", Toast.LENGTH_SHORT).show();
                 cleanGpsScan();
                 setupWifiScan();
             }
