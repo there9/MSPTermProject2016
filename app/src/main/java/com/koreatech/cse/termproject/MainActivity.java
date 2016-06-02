@@ -3,9 +3,11 @@ package com.koreatech.cse.termproject;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -22,18 +24,25 @@ import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.ListAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.text.DateFormat;
+import java.text.FieldPosition;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Comparator;
@@ -43,87 +52,91 @@ import java.util.List;
 public class MainActivity extends Activity implements View.OnClickListener {
     public final static String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject.alarm";
 
-    // UI ∞¸∑√
+    // UI Í¥ÄÎ†®
     TextView todayText;
     TextView summaryStepText;
     TextView totalStepTimeText;
     TextView maximumLocationText;
     TextView logText;
+    ListView logList;
+    ArrayAdapter<String> logListAdaptor;
 
-    // ºæº≠ ∞¸∑√
+    // ÏÑºÏÑú Í¥ÄÎ†®
     LocationManager locationManager;
     LocationProvider locationProvider;
     WifiManager wifiManager;
 
-    // GPS ∞¸∑√
+    // GPS Í¥ÄÎ†®
     long gpsStartTime;
     final int GPS_WAIT_MILLIS = 8000;
 
     double latitude;
-    double longtitude;
+    double longitude;
 
-    // ¡§«ÿ¡¯ ¿ßƒ° ¡§∫∏
+    // Ï†ïÌï¥ÏßÑ ÏúÑÏπò Ï†ïÎ≥¥
     Location sportGroundLocation;
     Location universityMainLocation;
 
-    // ∑Œ±◊ ∞¸∑√
-    String path = Environment.getExternalStorageDirectory().getAbsolutePath();
-    File logFile = new File(path + "/log.txt");
-    OutputStreamWriter logWriter;
-    FileInputStream logInputStream;
+    // Î°úÍ∑∏ Í¥ÄÎ†®
+    String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
+    PrintWriter logWriter;
     Date beforeDate = new Date();
 
     // Alarm broadcast
     AlarmManager alarmManager;
     PendingIntent alarmPendingIntent;
-    BroadcastReceiver alarmBroadcastReceiver = new AlarmBroadcastReceiver();
+    BroadcastReceiver alarmBroadcastReceiver;
 
     // StepMonitor broadcast
-    BroadcastReceiver stepBroadcastReceiver = new StepBroadcastReceiver();
+    BroadcastReceiver stepBroadcastReceiver;
 
     // Wifi scan broadcast
-    BroadcastReceiver wifiBroadcastReceiver = new WifiBroadcastReceiver();
+    BroadcastReceiver wifiBroadcastReceiver;
 
     // GPS status listener
-    GpsStatus.Listener gpsStatusListener = new GpsStatusListener();
-    LocationListener locationListener = new LocationListener();
+    GpsStatus.Listener gpsStatusListener;
+    LocationListener locationListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
-
-
-
-        // ºæº≠ ∞¸∑√
+        // ÏÑºÏÑú Í¥ÄÎ†®
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        // UI ∞¸∑√
+        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
+            showExitDialog("GPSÎ•º ÏÇ¨Ïö©Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+        if(wifiManager.isWifiEnabled() == false)
+            showExitDialog("ÏôÄÏù¥ÌååÏù¥Î•º ÏÇ¨Ïö©Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+
+        // UI Í¥ÄÎ†®
         todayText = (TextView) findViewById(R.id.todayTextView);
         summaryStepText = (TextView) findViewById(R.id.summaryStepText);
         totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
         logText = (TextView) findViewById(R.id.logText);
+        logList = (ListView) findViewById(R.id.logList);
+        logListAdaptor = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
 
-        // ∑Œ±◊ ∞¸∑√
+        todayText.setText((new SimpleDateFormat("yyyyÎÖÑ MÏõî ddÏùº", java.util.Locale.getDefault()).format(new Date())));
+        logText.setMovementMethod(new ScrollingMovementMethod());
+        logList.setAdapter(logListAdaptor);
+
+        // Î°úÍ∑∏ Í¥ÄÎ†®
         try {
-            logWriter = new OutputStreamWriter(new FileOutputStream(logFile, true), "UTF8");
-            logInputStream = new FileInputStream(logFile);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, true)));
         } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
-        todayText.setText((new SimpleDateFormat("yyyy≥‚ Mø˘ dd¿œ", java.util.Locale.getDefault()).format(new Date())));
-        logText.setMovementMethod(new ScrollingMovementMethod());
+        readUpdateLog();
 
-
-        // ¡§«ÿ¡¯ ¿ßƒ° ¡§∫∏
+        // Ï†ïÌï¥ÏßÑ ÏúÑÏπò Ï†ïÎ≥¥
         sportGroundLocation = new Location("");
         universityMainLocation = new Location("");
 
@@ -138,12 +151,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     protected void onDestroy() {
-        try {
-            logWriter.close();
-            logInputStream.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        logWriter.close();
+
         super.onDestroy();
     }
 
@@ -151,101 +160,197 @@ public class MainActivity extends Activity implements View.OnClickListener {
     protected void onResume() {
         super.onResume();
 
+        //readUpdateLog();
+
         // Alarm setting
-        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
-        alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
+        initAlarm();
 
         // Step Monitor
-        registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
-        startService(new Intent(this, StepMonitor.class));
+        //startStepMonitor();
 
         // Wifi scan setting
-        //setupWifiScan();
+        //startWifiScan();
 
         // GPS status setting
-        setupGpsScan();
+        //startGpsScan();
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         // step monitor stop
+        stopStepMonitor();
+
+        stopDetectorOfInOutdoor();
+    }
+
+    public void startDetectorOfInOutdoor() {
+        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
+            showExitDialog("GPSÎ•º ÏÇ¨Ïö©Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+        if(wifiManager.isWifiEnabled() == false)
+            showExitDialog("ÏôÄÏù¥ÌååÏù¥Î•º ÏÇ¨Ïö©Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+
+        if(locationListener != null || wifiBroadcastReceiver != null)
+            return;
+
+        Toast.makeText(getApplicationContext(), "ÌÉêÏßÄÏãúÏûë", Toast.LENGTH_SHORT).show();
+        // GPS status setting
+        startGpsScan();
+    }
+    public void stopDetectorOfInOutdoor() {
+        Toast.makeText(getApplicationContext(), "ÌÉêÏßÄÏ§ëÏßÄ", Toast.LENGTH_SHORT).show();
+
+        // alarm clean
+        cleanAlarm();
+
+        // wifi clean
+        stopWifiScan();
+
+        // GPS clean
+        stopGpsScan();
+    }
+
+    public void startStepMonitor() {
+        if(stepBroadcastReceiver != null)
+            return;
+
+        stepBroadcastReceiver = new StepBroadcastReceiver();
+
+        registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
+        startService(new Intent(this, StepMonitor.class));
+    }
+    public void stopStepMonitor() {
+        if(stepBroadcastReceiver == null)
+            return;
+
         unregisterReceiver(stepBroadcastReceiver);
         stopService(new Intent(this, StepMonitor.class));
 
-        // alarm clean
-        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
+        stepBroadcastReceiver = null;
+    }
+
+    public void initAlarm() {
+        alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
+    }
+    public void cleanAlarm() {
+        if(alarmBroadcastReceiver == null)
+            return;
+
         unregisterReceiver(alarmBroadcastReceiver);
         alarmManager.cancel(alarmPendingIntent);
 
-        // wifi clean
-        cleanWifiScan();
-
-        // GPS clean
-        cleanGpsScan();
+        alarmBroadcastReceiver = null;
     }
 
-    public void setupWifiScan() {
+    public void startWifiScan() {
+        if(wifiBroadcastReceiver != null)
+            return;
+
+        alarmBroadcastReceiver = new AlarmBroadcastReceiver();
+        wifiBroadcastReceiver = new WifiBroadcastReceiver();
+
         registerReceiver(alarmBroadcastReceiver, new IntentFilter(ALARM_BROADCAST_TAG));
         registerReceiver(wifiBroadcastReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+
         wifiManager.startScan();
     }
-    public void cleanWifiScan() {
-        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
+    public void stopWifiScan() {
+        if(wifiBroadcastReceiver == null)
+            return;
+
         unregisterReceiver(wifiBroadcastReceiver);
+        wifiBroadcastReceiver = null;
     }
 
-    public void setupGpsScan() {
+    public void startGpsScan() {
         gpsStartTime = System.currentTimeMillis();
+
+        if(gpsStatusListener != null)
+            return;
+
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
+
+        gpsStatusListener = new GpsStatusListener();
+        locationListener = new LocationListener();
+
         locationManager.addGpsStatusListener(gpsStatusListener);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
     }
-    public void cleanGpsScan() {
-        // TODO, BUG ¡æ∑·Ω√ crash √≥∏Æ
+    public void stopGpsScan() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
+
+        if(locationListener == null)
+            return;
+
         locationManager.removeGpsStatusListener(gpsStatusListener);
         locationManager.removeUpdates(locationListener);
+
+        gpsStatusListener = null;
+        locationListener = null;
     }
 
-    public void appendLog() {
-        try {
-            Date date = new Date();
-            long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
+    public void appendLog(String msg) {
+        Date date = new Date();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
+        long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
 
-            logWriter.write(
-                    beforeDate.getHours() + ":" +
-                            beforeDate.getMinutes() + "-" +
-                            date.getHours() + ":" +
-                            date.getMinutes() + " " +
-                            distantTime +"∫– "
-            );
-            beforeDate = new Date();
+        msg = "[" + dateFormat.format(date) + "] " + msg;
 
-            readUpdateLog();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        logWriter.println(msg);
+        logWriter.flush();
+        beforeDate = new Date();
+
+        logListAdaptor.add(msg);
+        //readUpdateLog();
     }
     public void readUpdateLog() {
-        try {
-            byte[] buffer = new byte[logInputStream.available()];
-            logInputStream.read(buffer);
+        if(logListAdaptor.getCount() > 0)
+            return;
 
-            logText.setText(buffer + "");
-        } catch (IOException e) {
+        try {
+            String buffer = "";
+            //String log = "";
+
+            FileInputStream file = new FileInputStream(logPath);
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
+            while ((buffer = bufferedReader.readLine()) != null) {
+                //log += buffer + "\n";
+                logListAdaptor.add(buffer);
+            }
+
+            //logText.setText(log.toString());
+        } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void showExitDialog(String msg) {
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setMessage(msg);
+        alert.setNegativeButton("ÌôïÏù∏", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                System.exit(1);
+            }
+        });
+        alert.show();
     }
 
     @Override
     public void onClick(View v) {
 
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if(event.getAction() == MotionEvent.ACTION_DOWN)
+            startDetectorOfInOutdoor();
+        return false;
     }
 
     class AlarmBroadcastReceiver extends BroadcastReceiver {
@@ -258,8 +363,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
     class StepBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
-            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
+            appendLog("STEP: " + intent.getIntExtra("steps", 0));
+            //logText.setText("STEP: " + intent.getIntExtra("steps", 0));
         }
     }
 
@@ -269,7 +374,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             List<ScanResult> scanResultList;
             scanResultList = wifiManager.getScanResults();
 
-            Toast.makeText(getApplicationContext(), "øÕ¿Ã∆ƒ¿Ã Ω∫ƒÀ..", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), "ÏôÄÏù¥ÌååÏù¥ Ïä§ÏºÑ..", Toast.LENGTH_SHORT).show();
 
             Collections.sort(scanResultList, new Comparator<ScanResult>() {
                 @Override
@@ -278,23 +383,50 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 }
             });
 
-            boolean isIndoor = false;
+            //boolean isIndoor = false;
+            String indoorLocationName = "Î™®Î•¥Îäî Ïã§ÎÇ¥";
             String str = "";
+
             for (ScanResult scanResult : scanResultList) {
                 str += scanResult.SSID + "\n";
                 str += "  BSSID: " + scanResult.BSSID + "\n";
                 str += "  Level: " + scanResult.level + "\n\n";
+
+                // MCMÎû©
                 if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
                     if (scanResult.level > -55) {
-                        isIndoor = true;
+                        //isIndoor = true;
+                        indoorLocationName = "MCMÎû©";
+                        //break;
+                    }
+                }
+
+                // A312
+                // NSTL 2.4GHz
+                if (scanResult.BSSID.equalsIgnoreCase("00:26:66:cc:e3:8c")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "A312: NSTL 2.4GHz";
+                        //break;
+                    }
+                }
+                // iptime
+                if (scanResult.BSSID.equalsIgnoreCase("90:9f:33:cd:28:62")) {
+                    if (scanResult.level > -60) {
+                        //isIndoor = true;
+                        indoorLocationName = "A312: iptime";
+                        //break;
                     }
                 }
             }
 
-            logText.setText((isIndoor ? "«ˆ¿Á¿ßƒ°: MCN∑¶" : "«ˆ¿Á¿ßƒ°: ∏∏£¥¬ Ω«≥ª") + "\n" + str);
+            //logText.setText((isIndoor ? "ÌòÑÏû¨ÏúÑÏπò: MCNÎû©" : "ÌòÑÏû¨ÏúÑÏπò: Î™®Î•¥Îäî Ïã§ÎÇ¥") + "\n" + str);
 
+            // NOTE Ïù¥ÎØ∏ Ïù¥ Îã®Í≥ÑÍπåÏßÄ ÏôîÎã§ÎäîÍ±¥ GPS(Ïã§Ïô∏) ÌåêÎã®Ïù¥ Ïã§Ìå®ÌïòÏó¨ ÎÑòÏñ¥ÏôîÏúºÎØÄÎ°ú Ïã§ÎÇ¥ÎùºÍ≥† ÌåêÎã®Ìï®
+            appendLog("ÌòÑÏû¨ÏúÑÏπò: " + indoorLocationName);
 
-            // TODO!!! GPS ∑Œ ≥—æÓ∞°¥¬∞≈ ±∏«ˆ
+            Log.d("WIFI", str);
+            stopDetectorOfInOutdoor();
         }
     }
 
@@ -317,20 +449,22 @@ public class MainActivity extends Activity implements View.OnClickListener {
             }
 
             if(count > 5) {
-                logText.setText("GPS>> Ω«ø‹∆«¡§µ .");
+                //logText.setText("GPS>> Ïã§Ïô∏ÌåêÏ†ïÎê®.");
+                appendLog("GPS>> Ïã§Ïô∏ÌåêÏ†ïÎê®." + count);
+                stopDetectorOfInOutdoor();
             } else {
                 if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
                     return;
                 }
-                // Ω«≥ª
-                Toast.makeText(getApplicationContext(), "GPS ≤®¡¸", Toast.LENGTH_SHORT).show();
-                cleanGpsScan();
-                setupWifiScan();
+                // Ïã§ÎÇ¥
+                Toast.makeText(getApplicationContext(), "GPS Í∫ºÏßê", Toast.LENGTH_SHORT).show();
+                stopGpsScan();
+                startWifiScan();
             }
 
             //Toast.makeText(getApplicationContext(), count, Toast.LENGTH_SHORT).show();
 
-            logText.setText(count + "");
+            //logText.setText(Integer.toString(count));
         }
     }
 
@@ -338,13 +472,16 @@ public class MainActivity extends Activity implements View.OnClickListener {
         @Override
         public void onLocationChanged(Location location) {
             latitude = location.getLatitude();
-            longtitude = location.getLongitude();
+            longitude = location.getLongitude();
         }
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) { }
         @Override
         public void onProviderEnabled(String provider) { }
         @Override
-        public void onProviderDisabled(String provider) { }
+        public void onProviderDisabled(String provider) {
+            if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
+                showExitDialog("GPSÎ•º ÏÇ¨Ïö©Ìï† Ïàò ÏóÜÏäµÎãàÎã§.");
+        }
     }
 }
