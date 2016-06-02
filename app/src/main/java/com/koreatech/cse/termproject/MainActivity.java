@@ -363,8 +363,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
     class StepBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            appendLog("STEP: " + intent.getIntExtra("steps", 0));
-            //logText.setText("STEP: " + intent.getIntExtra("steps", 0));
+            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
         }
     }
 
