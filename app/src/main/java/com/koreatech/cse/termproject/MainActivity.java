@@ -118,33 +118,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
             startService(new Intent(this, MyService.class));
 
         bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
-
-        //readUpdateLog();
-
-        // Alarm setting
-        //initAlarm();
-
-        // Step Monitor
-        //startStepMonitor();
-
-        // Wifi scan setting
-        //startWifiScan();
-
-        // GPS status setting
-        //startGpsScan();
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         unregisterReceiver(myBroadcastReceiver);
-
         unbindService(serviceConnection);
-
-        // step monitor stop
-        /*stopStepMonitor();
-
-        stopDetectorOfInOutdoor();*/
     }
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
