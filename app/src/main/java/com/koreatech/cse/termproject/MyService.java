@@ -85,6 +85,7 @@ public class MyService extends Service {
 
 
     public MyService() {
+
     }
 
     @Override
@@ -101,7 +102,7 @@ public class MyService extends Service {
 
         // 로그 관련
         try {
-            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, true)));
+            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, false)));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -119,7 +120,6 @@ public class MyService extends Service {
 
         // Alarm broadcast
         alarmPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, new Intent(ALARM_BROADCAST_TAG), 0);
-
         initAlarm();
 
         isRunning = true;
@@ -153,7 +153,7 @@ public class MyService extends Service {
         sendBroadcast(intent);
     }
 
-    private void startStepMonitor() {
+    public void startStepMonitor() {
         if(stepBroadcastReceiver != null)
             return;
 
@@ -182,7 +182,6 @@ public class MyService extends Service {
             return;
 
         Toast.makeText(getApplicationContext(), "탐지시작", Toast.LENGTH_SHORT).show();
-
         // NOTE GPS 먼저 검색을 시작함
         startGpsScan();
     }
@@ -288,15 +287,33 @@ public class MyService extends Service {
             wifiManager.startScan();
         }
     }
-
+    int totalStepCount;
+    String indoorString;
     class StepBroadcastReceiver extends BroadcastReceiver {
+        boolean isInText;
         @Override
         public void onReceive(Context context, Intent intent) {
-            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
-            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
+            totalStepCount = intent.getIntExtra("steps", 0);
+            intent.getLongExtra("currentDate", 0);
+            intent.getLongExtra("nowDate", 0);
+            Toast.makeText(getApplicationContext(), totalStepCount +" "+ intent.getBooleanExtra("isMoving",true),Toast.LENGTH_SHORT).show();
+            if(intent.getBooleanExtra("isMoving",true)==false)
+            {
+                indoorString = "정지";
+                startDetectorOfInOutdoor();
+            }
+            else
+            {
+
+                LocationInfo.totalSumStep(totalStepCount);
+                indoorString = "이동 "+totalStepCount +"걸음";
+                startDetectorOfInOutdoor();
+                stopStepMonitor();
+
+            }
         }
     }
-
+    String indoorLocationName = "";
     class WifiBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -313,7 +330,7 @@ public class MyService extends Service {
             });
 
             //boolean isIndoor = false;
-            String indoorLocationName = "모르는 실내";
+            indoorLocationName = "실내";
             String str = "";
 
             for (ScanResult scanResult : scanResultList) {
@@ -335,7 +352,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("00:26:66:cc:e3:8c")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312: NSTL 2.4GHz";
+                        indoorLocationName = "A312";
                         //break;
                     }
                 }
@@ -343,7 +360,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("90:9f:33:cd:28:62")) {
                     if (scanResult.level > -60) {
                         //isIndoor = true;
-                        indoorLocationName = "A312: iptime";
+                        indoorLocationName = "A312";
                         //break;
                     }
                 }
@@ -352,10 +369,11 @@ public class MyService extends Service {
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
 
             // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
-            appendLog("현재위치: " + indoorLocationName);
+            appendLog("현재위치: " +indoorString +" "+indoorLocationName);
 
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
+            startStepMonitor();
         }
     }
 
@@ -379,8 +397,10 @@ public class MyService extends Service {
 
             if(count > 5) {
                 //logText.setText("GPS>> 실외판정됨.");
-                appendLog("GPS>> 실외판정됨." + count);
+                indoorLocationName = "실외";
+                appendLog("현재위치: " + indoorString + " "+indoorLocationName);
                 stopDetectorOfInOutdoor();
+                startStepMonitor();
             } else {
                 if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
                     return;

@@ -12,6 +12,8 @@ import android.os.PowerManager;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.util.Date;
+
 public class StepMonitor extends Service implements SensorEventListener {
     public final static String STEP_BROADCAST_TAG = "com.koreatech.cse.termproject.step_scan";
 
@@ -31,6 +33,8 @@ public class StepMonitor extends Service implements SensorEventListener {
     private static final int NUMBER_OF_SAMPLES = 5;
     private static final double AVG_RMS_THRESHOLD = 2.5;
     private static final double NUMBER_OF_STEPS_PER_SEC = 1.5;
+
+
     @Override
     public void onCreate() {
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -82,23 +86,59 @@ public class StepMonitor extends Service implements SensorEventListener {
 
         }
     }
-    private static final int MINUTE_PER_MAXIMUN_STEP = 80;
-    private static final int ONE_MINUTE_COUNT = 900;
+    private static final int MINUTE_PER_MAXIMUN_STEP = 20; //80
+    private static final int ONE_MINUTE_COUNT = 100; ///900
+    private static final int STOP_COUNT_FIVE = 4;
+    int stopCount = 0;
     private int minute_count=0;
-    Intent intent = new Intent("No Moving Arlam");
+    Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
     private int totalStepCount = 0;
+    private boolean isMoving =false;
+    Date currentDate;
     private void computeSteps(float[] values) {
         double avgRms = 0;
 
         if(minute_count>ONE_MINUTE_COUNT) {
-            totalStepCount += steps;
-            if (steps < MINUTE_PER_MAXIMUN_STEP ) {
-                //1분간 걸음수를 채우지 못함
-                intent.putExtra("isMoving",true);
-                intent.putExtra("steps", (int) totalStepCount);
-                sendBroadcast(intent);
-                totalStepCount = 0;
+            Log.d("a", "" + stopCount + " " + isMoving);
+            if(stopCount>STOP_COUNT_FIVE)
+            {
+                if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>3)
+                {
+                    stopCount = 0;
+                    intent.putExtra("isMoving", false);
+                    intent.putExtra("steps", (int) totalStepCount);
+                    sendBroadcast(intent);
+
+                }
             }
+            if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
+                currentDate = new Date();
+                totalStepCount += steps;
+                isMoving = true;
+                stopCount = 0;
+            }
+            else if(totalStepCount > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
+            {
+                if(steps < MINUTE_PER_MAXIMUN_STEP)
+                {
+                    Date nowDate = new Date();
+                    intent.putExtra("currentDate", currentDate.getTime());
+                    intent.putExtra("nowDate", nowDate.getTime());
+                    intent.putExtra("isMoving", true);
+                    intent.putExtra("steps", (int) totalStepCount);
+                    totalStepCount = 0;
+                    sendBroadcast(intent);
+                    isMoving = false;
+                }
+            }
+            else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false)
+            {
+
+                totalStepCount = 0;
+                stopCount++;
+            }
+
+
             steps =0;
             minute_count = 0;
         }
@@ -120,7 +160,7 @@ public class StepMonitor extends Service implements SensorEventListener {
             }
 
             avgRms = sum / NUMBER_OF_SAMPLES;
-            Log.d(LOGTAG, "1sec avg rms: " + avgRms);
+            //Log.d(LOGTAG, "1sec avg rms: " + avgRms);
 
 
             // step result

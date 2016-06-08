@@ -6,7 +6,9 @@ public class LocationInfo {
     int step;
     static int totalStepCount;
     static int totalMovingTime;
+    LocationInfo() {
 
+    }
     public LocationInfo(String locationName, int step, float time) {
         this.locationName = locationName;
         this.step = step;
@@ -25,7 +27,7 @@ public class LocationInfo {
         return locationName;
     }
 
-    public int totalSumStep(int step) {
+    public  static int totalSumStep(int step) {
         return totalStepCount += step;
     }
 

@@ -60,6 +60,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView maximumLocationText;
     TextView logText;
     ListView logList;
+    public static LocationInfo locationInfo = new LocationInfo();
+
+
 
     ArrayAdapter<String> logListAdaptor;
 
@@ -98,7 +101,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
         logText.setMovementMethod(new ScrollingMovementMethod());
         logList.setAdapter(logListAdaptor);
-
         readUpdateLog();
     }
 
@@ -169,15 +171,16 @@ public class MainActivity extends Activity implements View.OnClickListener {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if(event.getAction() == MotionEvent.ACTION_DOWN)
-            myService.startDetectorOfInOutdoor();
-        return false;
+                myService.startStepMonitor();
+
+            return false;
     }
 
     public void readUpdateLog() {
         logListAdaptor.clear();
-
-        try {
-            String buffer = "";
+        totalStepTimeText.setText("Steps : "+LocationInfo.totalStepCount);
+            try {
+                String buffer = "";
 
             FileInputStream file = new FileInputStream(logPath);
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
