@@ -31,6 +31,8 @@ public class StepMonitor extends Service implements SensorEventListener {
     private static final int NUMBER_OF_SAMPLES = 5;
     private static final double AVG_RMS_THRESHOLD = 2.5;
     private static final double NUMBER_OF_STEPS_PER_SEC = 1.5;
+    long cureentTime;
+    long endTime;
     @Override
     public void onCreate() {
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -49,6 +51,7 @@ public class StepMonitor extends Service implements SensorEventListener {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        cureentTime = System.currentTimeMillis();
         Log.d("aaAAA","aaAAA");
         return super.onStartCommand(intent, flags, startId);
     }
@@ -86,20 +89,17 @@ public class StepMonitor extends Service implements SensorEventListener {
     private static final int ONE_MINUTE_COUNT = 900;
     private int minute_count=0;
     Intent intent = new Intent("No Moving Arlam");
-    private int totalStepCount = 0;
     private void computeSteps(float[] values) {
         double avgRms = 0;
 
         if(minute_count>ONE_MINUTE_COUNT) {
-            totalStepCount += steps;
             if (steps < MINUTE_PER_MAXIMUN_STEP ) {
-                //1분간 걸음수를 채우지 못함
+                //1분간 걸음수를 채우지 못함.
                 intent.putExtra("isMoving",true);
-                intent.putExtra("steps", (int) totalStepCount);
+                intent.putExtra("steps", (int) steps);
                 sendBroadcast(intent);
-                totalStepCount = 0;
+                steps =0;
             }
-            steps =0;
             minute_count = 0;
         }
         // X, Y, Z
