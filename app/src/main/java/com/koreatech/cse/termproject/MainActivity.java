@@ -6,10 +6,12 @@ import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.GpsSatellite;
 import android.location.GpsStatus;
@@ -21,6 +23,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.support.v4.app.ActivityCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -50,8 +53,6 @@ import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends Activity implements View.OnClickListener {
-    public final static String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject.alarm";
-
     // UI 관련
     TextView todayText;
     TextView summaryStepText;
@@ -59,58 +60,31 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView maximumLocationText;
     TextView logText;
     ListView logList;
+
     ArrayAdapter<String> logListAdaptor;
 
-    // 센서 관련
-    LocationManager locationManager;
-    LocationProvider locationProvider;
-    WifiManager wifiManager;
-
-    // GPS 관련
-    long gpsStartTime;
-    final int GPS_WAIT_MILLIS = 8000;
-
-    double latitude;
-    double longitude;
-
-    // 정해진 위치 정보
-    Location sportGroundLocation;
-    Location universityMainLocation;
-
     // 로그 관련
-    String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
-    PrintWriter logWriter;
-    Date beforeDate = new Date();
+    private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
+    private PrintWriter logWriter;
+    private Date beforeDate = new Date();
 
-    // Alarm broadcast
-    AlarmManager alarmManager;
-    PendingIntent alarmPendingIntent;
-    BroadcastReceiver alarmBroadcastReceiver;
-
-    // StepMonitor broadcast
-    BroadcastReceiver stepBroadcastReceiver;
-
-    // Wifi scan broadcast
-    BroadcastReceiver wifiBroadcastReceiver;
-
-    // GPS status listener
-    GpsStatus.Listener gpsStatusListener;
-    LocationListener locationListener;
+    // 서비스와 통신 관련
+    MyService myService;
+    private boolean isBound;
+    BroadcastReceiver myBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if(intent.hasExtra("error")) {
+                showExitDialog(intent.getStringExtra("error"));
+            }
+            readUpdateLog();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // 센서 관련
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
-        wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-
-        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
-            showExitDialog("GPS를 사용할 수 없습니다.");
-        if(wifiManager.isWifiEnabled() == false)
-            showExitDialog("와이파이를 사용할 수 없습니다.");
 
         // UI 관련
         todayText = (TextView) findViewById(R.id.todayTextView);
@@ -125,45 +99,30 @@ public class MainActivity extends Activity implements View.OnClickListener {
         logText.setMovementMethod(new ScrollingMovementMethod());
         logList.setAdapter(logListAdaptor);
 
-        // 로그 관련
-        try {
-            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, true)));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
         readUpdateLog();
-
-        // 정해진 위치 정보
-        sportGroundLocation = new Location("");
-        universityMainLocation = new Location("");
-
-        sportGroundLocation.setLatitude(36.762581);
-        sportGroundLocation.setLongitude(127.284527);
-        universityMainLocation.setLatitude(36.764215);
-        universityMainLocation.setLongitude(127.282173);
-
-        // Alarm broadcast
-        alarmPendingIntent = PendingIntent.getBroadcast(MainActivity.this, 0, new Intent(ALARM_BROADCAST_TAG), 0);
     }
 
     @Override
     protected void onDestroy() {
-        logWriter.close();
-
         super.onDestroy();
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
+        registerReceiver(myBroadcastReceiver, new IntentFilter(MyService.MY_SERVICE_BROADCAST_TAG));
+
+        if(MyService.isRunning == false)
+            startService(new Intent(this, MyService.class));
+
+        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+
         //readUpdateLog();
 
         // Alarm setting
-        initAlarm();
+        //initAlarm();
 
         // Step Monitor
         //startStepMonitor();
@@ -178,152 +137,53 @@ public class MainActivity extends Activity implements View.OnClickListener {
     protected void onPause() {
         super.onPause();
 
+        unregisterReceiver(myBroadcastReceiver);
+
+        unbindService(serviceConnection);
+
         // step monitor stop
-        stopStepMonitor();
+        /*stopStepMonitor();
 
-        stopDetectorOfInOutdoor();
+        stopDetectorOfInOutdoor();*/
     }
 
-    public void startDetectorOfInOutdoor() {
-        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
-            showExitDialog("GPS를 사용할 수 없습니다.");
-        if(wifiManager.isWifiEnabled() == false)
-            showExitDialog("와이파이를 사용할 수 없습니다.");
-
-        if(locationListener != null || wifiBroadcastReceiver != null)
-            return;
-
-        Toast.makeText(getApplicationContext(), "탐지시작", Toast.LENGTH_SHORT).show();
-        // GPS status setting
-        startGpsScan();
-    }
-    public void stopDetectorOfInOutdoor() {
-        Toast.makeText(getApplicationContext(), "탐지중지", Toast.LENGTH_SHORT).show();
-
-        // alarm clean
-        cleanAlarm();
-
-        // wifi clean
-        stopWifiScan();
-
-        // GPS clean
-        stopGpsScan();
-    }
-
-    public void startStepMonitor() {
-        if(stepBroadcastReceiver != null)
-            return;
-
-        stepBroadcastReceiver = new StepBroadcastReceiver();
-
-        registerReceiver(stepBroadcastReceiver, new IntentFilter(StepMonitor.STEP_BROADCAST_TAG));
-        startService(new Intent(this, StepMonitor.class));
-    }
-    public void stopStepMonitor() {
-        if(stepBroadcastReceiver == null)
-            return;
-
-        unregisterReceiver(stepBroadcastReceiver);
-        stopService(new Intent(this, StepMonitor.class));
-
-        stepBroadcastReceiver = null;
-    }
-
-    public void initAlarm() {
-        alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        alarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP, 0, 5000, alarmPendingIntent);
-    }
-    public void cleanAlarm() {
-        if(alarmBroadcastReceiver == null)
-            return;
-
-        unregisterReceiver(alarmBroadcastReceiver);
-        alarmManager.cancel(alarmPendingIntent);
-
-        alarmBroadcastReceiver = null;
-    }
-
-    public void startWifiScan() {
-        if(wifiBroadcastReceiver != null)
-            return;
-
-        alarmBroadcastReceiver = new AlarmBroadcastReceiver();
-        wifiBroadcastReceiver = new WifiBroadcastReceiver();
-
-        registerReceiver(alarmBroadcastReceiver, new IntentFilter(ALARM_BROADCAST_TAG));
-        registerReceiver(wifiBroadcastReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-
-        wifiManager.startScan();
-    }
-    public void stopWifiScan() {
-        if(wifiBroadcastReceiver == null)
-            return;
-
-        unregisterReceiver(wifiBroadcastReceiver);
-        wifiBroadcastReceiver = null;
-    }
-
-    public void startGpsScan() {
-        gpsStartTime = System.currentTimeMillis();
-
-        if(gpsStatusListener != null)
-            return;
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+    private ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        // 서비스와 연결되면
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            myService = ((MyService.ServiceBinder)service).getService();
+            isBound = true;
         }
-
-        gpsStatusListener = new GpsStatusListener();
-        locationListener = new LocationListener();
-
-        locationManager.addGpsStatusListener(gpsStatusListener);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, locationListener);
-    }
-    public void stopGpsScan() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+        @Override
+        // 서비스와 연결이 해제되면
+        public void onServiceDisconnected(ComponentName name) {
+            isBound = false;
         }
+    };
 
-        if(locationListener == null)
-            return;
+    @Override
+    public void onClick(View v) {
 
-        locationManager.removeGpsStatusListener(gpsStatusListener);
-        locationManager.removeUpdates(locationListener);
-
-        gpsStatusListener = null;
-        locationListener = null;
     }
 
-    public void appendLog(String msg) {
-        Date date = new Date();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
-        long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
-
-        msg = "[" + dateFormat.format(date) + "] " + msg;
-
-        logWriter.println(msg);
-        logWriter.flush();
-        beforeDate = new Date();
-
-        logListAdaptor.add(msg);
-        //readUpdateLog();
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if(event.getAction() == MotionEvent.ACTION_DOWN)
+            myService.startDetectorOfInOutdoor();
+        return false;
     }
+
     public void readUpdateLog() {
-        if(logListAdaptor.getCount() > 0)
-            return;
+        logListAdaptor.clear();
 
         try {
             String buffer = "";
-            //String log = "";
 
             FileInputStream file = new FileInputStream(logPath);
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
             while ((buffer = bufferedReader.readLine()) != null) {
-                //log += buffer + "\n";
                 logListAdaptor.add(buffer);
             }
-
-            //logText.setText(log.toString());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -341,147 +201,5 @@ public class MainActivity extends Activity implements View.OnClickListener {
         alert.show();
     }
 
-    @Override
-    public void onClick(View v) {
 
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if(event.getAction() == MotionEvent.ACTION_DOWN)
-            startDetectorOfInOutdoor();
-        return false;
-    }
-
-    class AlarmBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            wifiManager.startScan();
-        }
-    }
-
-    class StepBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
-            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    class WifiBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            List<ScanResult> scanResultList;
-            scanResultList = wifiManager.getScanResults();
-
-            Toast.makeText(getApplicationContext(), "와이파이 스켄..", Toast.LENGTH_SHORT).show();
-
-            Collections.sort(scanResultList, new Comparator<ScanResult>() {
-                @Override
-                public int compare(ScanResult lhs, ScanResult rhs) {
-                    return rhs.level - lhs.level;
-                }
-            });
-
-            //boolean isIndoor = false;
-            String indoorLocationName = "모르는 실내";
-            String str = "";
-
-            for (ScanResult scanResult : scanResultList) {
-                str += scanResult.SSID + "\n";
-                str += "  BSSID: " + scanResult.BSSID + "\n";
-                str += "  Level: " + scanResult.level + "\n\n";
-
-                // MCM랩
-                if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
-                    if (scanResult.level > -55) {
-                        //isIndoor = true;
-                        indoorLocationName = "MCM랩";
-                        //break;
-                    }
-                }
-
-                // A312
-                // NSTL 2.4GHz
-                if (scanResult.BSSID.equalsIgnoreCase("00:26:66:cc:e3:8c")) {
-                    if (scanResult.level > -65) {
-                        //isIndoor = true;
-                        indoorLocationName = "A312: NSTL 2.4GHz";
-                        //break;
-                    }
-                }
-                // iptime
-                if (scanResult.BSSID.equalsIgnoreCase("90:9f:33:cd:28:62")) {
-                    if (scanResult.level > -60) {
-                        //isIndoor = true;
-                        indoorLocationName = "A312: iptime";
-                        //break;
-                    }
-                }
-            }
-
-            //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
-
-            // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
-            appendLog("현재위치: " + indoorLocationName);
-
-            Log.d("WIFI", str);
-            stopDetectorOfInOutdoor();
-        }
-    }
-
-    class GpsStatusListener implements GpsStatus.Listener {
-        @Override
-        public void onGpsStatusChanged(int event) {
-            if(event != GpsStatus.GPS_EVENT_SATELLITE_STATUS)
-                return;
-
-            GpsStatus gpsStatus = locationManager.getGpsStatus(null);
-            Iterable<GpsSatellite> gpsSatellites = gpsStatus.getSatellites();
-
-            int count = 0;
-            String str = "";
-            for(GpsSatellite gpsSatellite : gpsSatellites) {
-                if(gpsSatellite.usedInFix()) {
-                    count++;
-                    //str += "[" + count + "] " + gpsSatellite.toString() + "\n";
-                }
-            }
-
-            if(count > 5) {
-                //logText.setText("GPS>> 실외판정됨.");
-                appendLog("GPS>> 실외판정됨." + count);
-                stopDetectorOfInOutdoor();
-            } else {
-                if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
-                    return;
-                }
-                // 실내
-                Toast.makeText(getApplicationContext(), "GPS 꺼짐", Toast.LENGTH_SHORT).show();
-                stopGpsScan();
-                startWifiScan();
-            }
-
-            //Toast.makeText(getApplicationContext(), count, Toast.LENGTH_SHORT).show();
-
-            //logText.setText(Integer.toString(count));
-        }
-    }
-
-    class LocationListener implements android.location.LocationListener {
-        @Override
-        public void onLocationChanged(Location location) {
-            latitude = location.getLatitude();
-            longitude = location.getLongitude();
-        }
-        @Override
-        public void onStatusChanged(String provider, int status, Bundle extras) { }
-        @Override
-        public void onProviderEnabled(String provider) { }
-        @Override
-        public void onProviderDisabled(String provider) {
-            if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
-                showExitDialog("GPS를 사용할 수 없습니다.");
-        }
-    }
 }
