@@ -100,12 +100,15 @@ public class MainActivity extends Activity implements View.OnClickListener {
         logList.setAdapter(logListAdaptor);
 
         readUpdateLog();
+
+        startService(new Intent(this, StepMonitor.class));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
 
+        stopService(new Intent(this, StepMonitor.class));
     }
 
     @Override
@@ -114,17 +117,17 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
         registerReceiver(myBroadcastReceiver, new IntentFilter(MyService.MY_SERVICE_BROADCAST_TAG));
 
-        if(MyService.isRunning == false)
+        /*if(MyService.isRunning == false)
             startService(new Intent(this, MyService.class));
 
-        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);*/
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         unregisterReceiver(myBroadcastReceiver);
-        unbindService(serviceConnection);
+        /*unbindService(serviceConnection);*/
     }
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -148,8 +151,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if(event.getAction() == MotionEvent.ACTION_DOWN)
-            myService.startDetectorOfInOutdoor();
+        //if(event.getAction() == MotionEvent.ACTION_DOWN)
+            //myService.startDetectorOfInOutdoor();
         return false;
     }
 

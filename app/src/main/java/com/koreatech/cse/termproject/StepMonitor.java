@@ -7,13 +7,23 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
-import android.widget.Toast;
+
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 
 public class StepMonitor extends Service implements SensorEventListener {
     public final static String STEP_BROADCAST_TAG = "com.koreatech.cse.termproject.step_scan";
+    private final String LOGTAG = "StepMonitor";
 
     private SensorManager sensorManager;
     private Sensor accelerometerSensor;
@@ -21,35 +31,44 @@ public class StepMonitor extends Service implements SensorEventListener {
     private PowerManager powerManager;
     private PowerManager.WakeLock wakeLock;
 
-    private long prevT, currT;
-    private double[] rmsArray;
-    private int rmsCount;
-    private double steps;
+    long prevPickTime = 0;
+    long curPickTime = 0;
+    long timeSum = 0;
 
-    private final String LOGTAG = "StepMonitor";
+    int stepScanTime = 3000;
+    long timeDifference = 65000000;     // ns = 65ms = 1000ms
+    ArrayList<Double> RMS = new ArrayList<>();
 
-    private static final int NUMBER_OF_SAMPLES = 5;
-    private static final double AVG_RMS_THRESHOLD = 2.5;
-    private static final double NUMBER_OF_STEPS_PER_SEC = 1.5;
+    int step = 0;
+
+    // 로그 관련
+    private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/step.txt";
+    private PrintWriter logWriter;
+    private Date beforeDate = new Date();
+
+
     @Override
     public void onCreate() {
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
 
-        prevT = currT = 0;
-        rmsCount = 0;
-        rmsArray = new double[NUMBER_OF_SAMPLES];
-
         powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "step");
         wakeLock.acquire();
 
+        // 로그 관련
+        try {
+            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, true)));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d("aaAAA","aaAAA");
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -68,25 +87,62 @@ public class StepMonitor extends Service implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
+        double avgRMS = 0;
+
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
+            curPickTime = event.timestamp;
+            timeSum += (curPickTime - prevPickTime) / 1000000;
+            prevPickTime = curPickTime;
 
-            currT = event.timestamp;
-            double dt = (currT - prevT) / 1000000;
-            //Log.d(LOGTAG, "time difference=" + dt);
-            prevT = currT;
-            minute_count++;
-            //Log.d(LOGTAG, minute_count+"");
-            float[] values = event.values.clone();
+            // 순간 RMS 추가
+            RMS.add(Math.sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2]));
 
-            computeSteps(values);
+            if(timeSum > stepScanTime) {
+                Log.d(LOGTAG, stepScanTime + "ms post..");
 
+                // RMS 평균 구하기
+                for(double e: RMS) {
+                    appendLog(Double.toString(e));
+                    avgRMS += e;
+                }
+                avgRMS /= RMS.size();
+
+                if(avgRMS > 4.5) {
+                    double localCount = 0;
+                    double localMax = 0;
+
+                    for (double e : RMS) {
+                        if (localCount < 5) {
+                            localMax = e > localMax ? e : localMax;
+                            localCount++;
+                        } else {
+                            if (localMax > avgRMS)
+                                step++;
+
+                            localMax = 0;
+                            localCount = 0;
+                        }
+                    }
+                }
+
+                appendLog("*** AVG : " + avgRMS);
+                appendLog("***>>>>>>>> STEP : " + step);
+
+                Log.d(LOGTAG, Double.toString(avgRMS));
+                Log.d(LOGTAG, ">>>STEP: " + Double.toString(step));
+
+                RMS.clear();
+                timeSum = 0;
+            }
         }
     }
-    private static final int MINUTE_PER_MAXIMUN_STEP = 80;
-    private static final int ONE_MINUTE_COUNT = 900;
-    private int minute_count=0;
-    Intent intent = new Intent("No Moving Arlam");
-    private int totalStepCount = 0;
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
+
+    /*
     private void computeSteps(float[] values) {
         double avgRms = 0;
 
@@ -143,10 +199,18 @@ public class StepMonitor extends Service implements SensorEventListener {
             rmsCount++;
         }
     }
+    */
 
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+    public void appendLog(String msg) {
+        Date date = new Date();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
 
+        msg = "[" + dateFormat.format(date) + "] " + msg;
+
+        logWriter.println(msg);
+        logWriter.flush();
+        beforeDate = new Date();
     }
 }
 
