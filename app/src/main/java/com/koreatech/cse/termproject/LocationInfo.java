@@ -1,26 +1,25 @@
 package com.koreatech.cse.termproject;
 
 public class LocationInfo {
-    String locationName;
-    float time;
-    int step;
-    static int totalStepCount;
-    static int totalMovingTime;
+    String locationName = "없음";
+    long time = -5;
+    static int totalStepCount =0;
+    static long totalMovingTime =0;
     LocationInfo() {
 
-    }
-    public LocationInfo(String locationName, int step, float time) {
-        this.locationName = locationName;
-        this.step = step;
-        this.time = time;
     }
 
     public float getTime() {
         return time;
     }
 
-    public int getStep() {
-        return step;
+    public void timeCompare(long time, String locationName)
+    {
+        if(this.time<time && locationName != "실내" && locationName != "실외")
+        {
+            this.time = time;
+            this.locationName = locationName;
+        }
     }
 
     public String getLocationName() {
@@ -31,10 +30,7 @@ public class LocationInfo {
         return totalStepCount += step;
     }
 
-    public static int totalSumMovingTime(int movingTime) {
+    public long totalSumMovingTime(long movingTime) {
         return totalMovingTime += movingTime;
     }
-
-
-
 }

@@ -65,7 +65,10 @@ public class MyService extends Service {
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
+    private String logSummaryPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/summary.txt";
+
     private PrintWriter logWriter;
+    private PrintWriter logSummaryWriter;
     private Date beforeDate = new Date();
 
     // Alarm broadcast
@@ -103,6 +106,7 @@ public class MyService extends Service {
         // 로그 관련
         try {
             logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, false)));
+            logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -131,7 +135,7 @@ public class MyService extends Service {
         stopDetectorOfInOutdoor();
 
         logWriter.close();
-
+        logSummaryWriter.close();
         isRunning = false;
     }
 
@@ -270,12 +274,26 @@ public class MyService extends Service {
     public void appendLog(String msg) {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
-        long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
+        long distantTime = (date.getTime() - writeDate.getTime()) /  60000;
+        if(isMoving==true) {
+            MainActivity.locationInfo.totalSumMovingTime(distantTime);
+        }
+        else
+        {
+            MainActivity.locationInfo.timeCompare(distantTime, indoorLocationName);
+        }
+        try {
+            logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
 
-        msg = "[" + dateFormat.format(date) + "] " + msg;
+        msg = "["+ dateFormat.format(writeDate)+"-"+ dateFormat.format(date) + "] " + distantTime + "분 " + msg;
+        logSummaryWriter.write(LocationInfo.totalMovingTime + "\n" + LocationInfo.totalStepCount + "\n" + MainActivity.locationInfo.locationName + "\n" + MainActivity.locationInfo.time);
+        logSummaryWriter.flush();
 
         logWriter.println(msg);
         logWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         beforeDate = new Date();
 
         sendBroadcast(new Intent(MY_SERVICE_BROADCAST_TAG));
@@ -289,23 +307,23 @@ public class MyService extends Service {
     }
     int totalStepCount;
     String indoorString;
+    Date writeDate;
+    boolean isMoving = false;
     class StepBroadcastReceiver extends BroadcastReceiver {
-        boolean isInText;
         @Override
         public void onReceive(Context context, Intent intent) {
             totalStepCount = intent.getIntExtra("steps", 0);
-            Date date = new Date(intent.getLongExtra("nowDate", 0)-intent.getLongExtra("currentDate", 0));
-
-            Log.d("date", date.getTime()/1000/60+"");
-            Toast.makeText(getApplicationContext(), totalStepCount +" "+ intent.getBooleanExtra("isMoving",true),Toast.LENGTH_SHORT).show();
-            if(intent.getBooleanExtra("isMoving",true)==false)
+            writeDate = new Date();
+            writeDate.setTime(intent.getLongExtra("currentDate", 0));
+            isMoving = intent.getBooleanExtra("isMoving",true);
+            isMoving = intent.getBooleanExtra("isMoving",true);
+            if(isMoving==false)
             {
                 indoorString = "정지";
                 startDetectorOfInOutdoor();
             }
             else
             {
-                LocationInfo.totalSumMovingTime((int)date.getTime()/1000/60);
                 LocationInfo.totalSumStep(totalStepCount);
                 indoorString = "이동 "+totalStepCount +"걸음";
                 startDetectorOfInOutdoor();
@@ -370,7 +388,7 @@ public class MyService extends Service {
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
 
             // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
-            appendLog("현재위치: " +indoorString +" "+indoorLocationName);
+            appendLog(indoorString +" "+indoorLocationName);
 
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
@@ -399,7 +417,7 @@ public class MyService extends Service {
             if(count > 5) {
                 //logText.setText("GPS>> 실외판정됨.");
                 indoorLocationName = "실외";
-                appendLog("현재위치: " + indoorString + " "+indoorLocationName);
+                appendLog(indoorString + " "+indoorLocationName);
                 stopDetectorOfInOutdoor();
                 startStepMonitor();
             } else {

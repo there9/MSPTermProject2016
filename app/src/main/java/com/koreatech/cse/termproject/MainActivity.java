@@ -56,9 +56,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
     // UI 관련
     TextView todayText;
     TextView summaryStepText;
-    public static TextView totalStepTimeText;
-    public static TextView maximumLocationText;
-    TextView logText;
+    TextView totalStepTimeText;
+    TextView maximumLocationText;
     ListView logList;
     public static LocationInfo locationInfo = new LocationInfo();
 
@@ -94,12 +93,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
         summaryStepText = (TextView) findViewById(R.id.summaryStepText);
         totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
-        logText = (TextView) findViewById(R.id.logText);
         logList = (ListView) findViewById(R.id.logList);
         logListAdaptor = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
 
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
-        logText.setMovementMethod(new ScrollingMovementMethod());
         logList.setAdapter(logListAdaptor);
         readUpdateLog();
     }
@@ -178,8 +175,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     public void readUpdateLog() {
         logListAdaptor.clear();
-        totalStepTimeText.setText("Steps : "+LocationInfo.totalStepCount);
-        total
+        summaryStepText.setText("Steps : " + LocationInfo.totalStepCount);
+        totalStepTimeText.setText("Moving Time : " + LocationInfo.totalMovingTime+"분");
+        maximumLocationText.setText("Top Place : " + MainActivity.locationInfo.locationName);
             try {
                 String buffer = "";
 
