@@ -61,6 +61,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView logText;
     ListView logList;
 
+    int step = 0;
+
+    Location lastLocation;
+
     ArrayAdapter<String> logListAdaptor;
 
     // 로그 관련
@@ -74,9 +78,21 @@ public class MainActivity extends Activity implements View.OnClickListener {
     BroadcastReceiver myBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            logText.setText("");
+            if(intent.hasExtra("location")) {
+                lastLocation = intent.getParcelableExtra("location");
+                logText.append(lastLocation.getLatitude() + " / " + lastLocation.getLongitude() + "\n" +
+                        "운동장: " + intent.getFloatExtra("ground", -1) + "m\n" +
+                        "본부: " + intent.getFloatExtra("main", -1) + "m\n" +
+                        "4공: " + intent.getFloatExtra("comgong", -1) + "m\n" +
+                        "---------\n" +
+                        "오차: " + lastLocation.getAccuracy() + "m\n" +
+                        "---------\n");
+            }
             if(intent.hasExtra("error")) {
                 showExitDialog(intent.getStringExtra("error"));
             }
+            logText.append("걸음수: " + StepMonitor.step);
             readUpdateLog();
         }
     };
@@ -101,6 +117,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
         readUpdateLog();
 
+        if(MyService.isRunning == false)
+            startService(new Intent(this, MyService.class));
+
+        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+
         startService(new Intent(this, StepMonitor.class));
     }
 
@@ -108,6 +129,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     protected void onDestroy() {
         super.onDestroy();
 
+        unbindService(serviceConnection);
         stopService(new Intent(this, StepMonitor.class));
     }
 
@@ -116,18 +138,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onResume();
 
         registerReceiver(myBroadcastReceiver, new IntentFilter(MyService.MY_SERVICE_BROADCAST_TAG));
-
-        /*if(MyService.isRunning == false)
-            startService(new Intent(this, MyService.class));
-
-        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);*/
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         unregisterReceiver(myBroadcastReceiver);
-        /*unbindService(serviceConnection);*/
     }
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -151,8 +167,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        //if(event.getAction() == MotionEvent.ACTION_DOWN)
+        if(event.getAction() == MotionEvent.ACTION_DOWN) {
             //myService.startDetectorOfInOutdoor();
+            myService.stopDetectOutdoorLocation();
+            myService.startDetectOutdoorLocation();
+        }
         return false;
     }
 

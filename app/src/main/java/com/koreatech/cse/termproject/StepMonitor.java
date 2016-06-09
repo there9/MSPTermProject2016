@@ -39,7 +39,7 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    int step = 0;
+    public static int step = 0;
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/step.txt";
@@ -136,6 +136,8 @@ public class StepMonitor extends Service implements SensorEventListener {
 
                 Log.d(LOGTAG, Double.toString(avgRMS));
                 Log.d(LOGTAG, ">>>STEP: " + Double.toString(step));
+
+                sendBroadcast(new Intent(MyService.MY_SERVICE_BROADCAST_TAG));
 
                 RMS.clear();
                 timeSum = 0;

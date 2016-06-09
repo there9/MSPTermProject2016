@@ -2,19 +2,16 @@ package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.AlarmManager;
-import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.GpsSatellite;
 import android.location.GpsStatus;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.net.wifi.ScanResult;
@@ -27,13 +24,10 @@ import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -44,6 +38,7 @@ import java.util.List;
 public class MyService extends Service {
     public final static String MY_SERVICE_BROADCAST_TAG = "com.koreatech.cse.termproject.service";
     private final static String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject.alarm";
+    private final static String PROXIMITY_BROADCAST_TAG = "com.koreatech.cse.termproject.proximity";
 
     public static boolean isRunning;
 
@@ -56,12 +51,10 @@ public class MyService extends Service {
     private long gpsStartTime;
     private final int GPS_WAIT_MILLIS = 8000;
 
-    private double latitude;
-    private double longitude;
-
     // 정해진 위치 정보
     private Location sportGroundLocation;
     private Location universityMainLocation;
+    private Location comgongLocation;
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
@@ -72,6 +65,13 @@ public class MyService extends Service {
     private AlarmManager alarmManager;
     private PendingIntent alarmPendingIntent;
     private BroadcastReceiver alarmBroadcastReceiver;
+
+    // 근접 경보
+    /*private PendingIntent proximityGroundPendingIntent;     // 운동장
+    private PendingIntent proximityTeldongPendingIntent;     // 텔동
+    private PendingIntent proximityComgongPendingIntent;     // 4공 잔디
+    private BroadcastReceiver proximityBroadcastReceiver;*/
+    private LocationListener locationListenerByProximity;
 
     // StepMonitor broadcast
     private BroadcastReceiver stepBroadcastReceiver;
@@ -94,9 +94,9 @@ public class MyService extends Service {
         locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
+        if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
             showExitDialog("GPS를 사용할 수 없습니다.");
-        if(wifiManager.isWifiEnabled() == false)
+        if (wifiManager.isWifiEnabled() == false)
             showExitDialog("와이파이를 사용할 수 없습니다.");
 
         // 로그 관련
@@ -109,16 +109,34 @@ public class MyService extends Service {
         }
 
         // 정해진 위치 정보
-        sportGroundLocation = new Location("");
-        universityMainLocation = new Location("");
+        sportGroundLocation = new Location(LocationManager.GPS_PROVIDER);
+        universityMainLocation = new Location(LocationManager.GPS_PROVIDER);
+        comgongLocation = new Location(LocationManager.GPS_PROVIDER);
 
         sportGroundLocation.setLatitude(36.762581);
         sportGroundLocation.setLongitude(127.284527);
+
         universityMainLocation.setLatitude(36.764215);
         universityMainLocation.setLongitude(127.282173);
 
+        comgongLocation.setLatitude(36.761369);
+        comgongLocation.setLongitude(127.280265);
+
         // Alarm broadcast
         alarmPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, new Intent(ALARM_BROADCAST_TAG), 0);
+
+        // Proximity Alert
+        /*Intent groundIntent = new Intent(PROXIMITY_BROADCAST_TAG);
+        Intent teldongIntent = new Intent(PROXIMITY_BROADCAST_TAG);
+        Intent comgongIntent = new Intent(PROXIMITY_BROADCAST_TAG);*/
+
+        //groundIntent.putExtra("location", "ground");
+        //teldongIntent.putExtra("location", "teldong");
+        //comgongIntent.putExtra("location", "comgong");
+
+        //proximityGroundPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, groundIntent, 0);
+        //proximityTeldongPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, teldongIntent, 0);
+        //proximityComgongPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, comgongIntent, 0);
 
         initAlarm();
 
@@ -151,6 +169,45 @@ public class MyService extends Service {
         intent.putExtra("error", msg);
 
         sendBroadcast(intent);
+    }
+
+    public void startDetectOutdoorLocation() {
+        /**if(proximityBroadcastReceiver != null)
+            return;
+
+        proximityBroadcastReceiver = new ProximityBroadcastReceiver();*/
+        locationListenerByProximity = new LocationListener();
+
+        //registerReceiver(proximityBroadcastReceiver, new IntentFilter(PROXIMITY_BROADCAST_TAG));
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 1, locationListenerByProximity);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        // 운동장
+        //locationManager.addProximityAlert(36.762581, 127.284527, 80, -1, proximityGroundPendingIntent);
+        // 텔동
+        //locationManager.addProximityAlert(36.764215, 127.282173, 50, -1, proximityTeldongPendingIntent);
+
+        //컴공
+        //locationManager.addProximityAlert(36.761369, 127.280265, 5, -1, proximityComgongPendingIntent);
+    }
+    public void stopDetectOutdoorLocation() {
+        if(locationListenerByProximity == null)
+            return;
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        //locationManager.removeProximityAlert(proximityGroundPendingIntent);
+        //locationManager.removeProximityAlert(proximityTeldongPendingIntent);
+        //locationManager.removeProximityAlert(proximityComgongPendingIntent);
+
+        /*unregisterReceiver(proximityBroadcastReceiver);
+        proximityBroadcastReceiver = null;*/
+
+        locationManager.removeUpdates(locationListenerByProximity);
+        locationListenerByProximity = null;
     }
 
     private void startStepMonitor() {
@@ -335,18 +392,85 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("00:26:66:cc:e3:8c")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312: NSTL 2.4GHz";
+                        indoorLocationName = "A312";
                         //break;
                     }
                 }
                 // iptime
                 if (scanResult.BSSID.equalsIgnoreCase("90:9f:33:cd:28:62")) {
-                    if (scanResult.level > -60) {
+                    if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312: iptime";
+                        indoorLocationName = "A312";
                         //break;
                     }
                 }
+                // KUTAP
+                if (scanResult.BSSID.equalsIgnoreCase("50:1c:bf:41:cf:20")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "A312";
+                        //break;
+                    }
+                }
+                // KUTAP_N
+                if (scanResult.BSSID.equalsIgnoreCase("50:1c:bf:41:cf:21")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "A312";
+                        //break;
+                    }
+                }
+
+                // 다산
+                // KUTAP_N
+                if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:ce")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+                // KUTAP
+                if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:cf")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+                // KUTAP
+                if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:c0")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+                // KUTAP
+                if (scanResult.BSSID.equalsIgnoreCase("a4:18:75:58:77:d0")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+                // KUTAP_N
+                if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:c1")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+                // KUTAP_N
+                if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:49:5c:ee")) {
+                    if (scanResult.level > -65) {
+                        //isIndoor = true;
+                        indoorLocationName = "다산";
+                        //break;
+                    }
+                }
+
             }
 
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
@@ -356,6 +480,13 @@ public class MyService extends Service {
 
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
+        }
+    }
+
+    class ProximityBroadcastReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Toast.makeText(getApplicationContext(), intent.getStringExtra("location") + "접근 중", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -400,8 +531,12 @@ public class MyService extends Service {
     class LocationListener implements android.location.LocationListener {
         @Override
         public void onLocationChanged(Location location) {
-            latitude = location.getLatitude();
-            longitude = location.getLongitude();
+            Intent intent = new Intent(MY_SERVICE_BROADCAST_TAG);
+            intent.putExtra("location", location);
+            intent.putExtra("ground", location.distanceTo(sportGroundLocation));
+            intent.putExtra("main", location.distanceTo(universityMainLocation));
+            intent.putExtra("comgong", location.distanceTo(comgongLocation));
+            sendBroadcast(intent);
         }
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) { }
