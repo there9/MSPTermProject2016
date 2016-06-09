@@ -56,8 +56,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
     // UI 관련
     TextView todayText;
     TextView summaryStepText;
-    TextView totalStepTimeText;
-    TextView maximumLocationText;
+    public static TextView totalStepTimeText;
+    public static TextView maximumLocationText;
     TextView logText;
     ListView logList;
     public static LocationInfo locationInfo = new LocationInfo();
@@ -179,6 +179,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     public void readUpdateLog() {
         logListAdaptor.clear();
         totalStepTimeText.setText("Steps : "+LocationInfo.totalStepCount);
+        total
             try {
                 String buffer = "";
 

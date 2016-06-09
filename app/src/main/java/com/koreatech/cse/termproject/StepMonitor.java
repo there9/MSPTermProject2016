@@ -87,7 +87,7 @@ public class StepMonitor extends Service implements SensorEventListener {
         }
     }
     private static final int MINUTE_PER_MAXIMUN_STEP = 20; //80
-    private static final int ONE_MINUTE_COUNT = 100; ///900
+    private static final int ONE_MINUTE_COUNT = 300; ///900
     private static final int STOP_COUNT_FIVE = 4;
     int stopCount = 0;
     private int minute_count=0;

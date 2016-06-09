@@ -31,7 +31,10 @@ public class LocationInfo {
         return totalStepCount += step;
     }
 
-    public int totalSumMovingTime(int movingTime) {
+    public static int totalSumMovingTime(int movingTime) {
         return totalMovingTime += movingTime;
     }
+
+
+
 }

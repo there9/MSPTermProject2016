@@ -294,8 +294,9 @@ public class MyService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             totalStepCount = intent.getIntExtra("steps", 0);
-            intent.getLongExtra("currentDate", 0);
-            intent.getLongExtra("nowDate", 0);
+            Date date = new Date(intent.getLongExtra("nowDate", 0)-intent.getLongExtra("currentDate", 0));
+
+            Log.d("date", date.getTime()/1000/60+"");
             Toast.makeText(getApplicationContext(), totalStepCount +" "+ intent.getBooleanExtra("isMoving",true),Toast.LENGTH_SHORT).show();
             if(intent.getBooleanExtra("isMoving",true)==false)
             {
@@ -304,7 +305,7 @@ public class MyService extends Service {
             }
             else
             {
-
+                LocationInfo.totalSumMovingTime((int)date.getTime()/1000/60);
                 LocationInfo.totalSumStep(totalStepCount);
                 indoorString = "이동 "+totalStepCount +"걸음";
                 startDetectorOfInOutdoor();
