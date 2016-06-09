@@ -11,6 +11,7 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
@@ -39,7 +40,17 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    public static int step = 0;
+    private static final int MINUTE_PER_MAXIMUN_STEP = 80; //80
+    private static final int ONE_MINUTE_COUNT = 150; ///900
+    private static final int STOP_COUNT_FIVE = 4;
+    int stopCount = 0;
+    private int minute_count=0;
+    Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
+    private int totalStepCount = 0;
+    private boolean isMoving =false;
+    Date currentDate;
+
+    public static int steps = 0;
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/step.txt";
@@ -65,6 +76,7 @@ public class StepMonitor extends Service implements SensorEventListener {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
     }
 
     @Override
@@ -88,13 +100,58 @@ public class StepMonitor extends Service implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
         double avgRMS = 0;
-
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             curPickTime = event.timestamp;
             // 가속도 측정 시간 누적
             timeSum += (curPickTime - prevPickTime) / 1000000;
             prevPickTime = curPickTime;
+            Log.d("a", "" + minute_count + "" + stopCount + " " + isMoving);
+            if(stopCount>STOP_COUNT_FIVE)
+            {
+                if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>0)
+                {
+                    stopCount = 0;
+                        intent.putExtra("isMoving", false);
+                intent.putExtra("steps", (int) totalStepCount);
+                intent.putExtra("currentDate", currentDate.getTime());
+                sendBroadcast(intent);
+            }
+        }
+        if(minute_count>ONE_MINUTE_COUNT) {
+            Log.d("a", "" + stopCount + " " + isMoving);
 
+                if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
+                    currentDate = new Date();
+                    totalStepCount += steps;
+                    isMoving = true;
+                    stopCount = 0;
+                }
+                else if(totalStepCount > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
+                {
+                    if(steps < MINUTE_PER_MAXIMUN_STEP)
+                    {
+                        Date nowDate = new Date();
+                        intent.putExtra("currentDate", currentDate.getTime());
+                        intent.putExtra("isMoving", true);
+                        intent.putExtra("steps", (int) totalStepCount);
+                        totalStepCount = 0;
+                        sendBroadcast(intent);
+                        isMoving = false;
+                    }
+                    stopCount = 0;
+                }
+                else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false) {
+                    if (stopCount == 0)
+                    {
+                        currentDate = new Date();
+                    }
+                    totalStepCount = 0;
+                    stopCount++;
+                }
+                steps =0;
+                minute_count = 0;
+            }
+            minute_count++;
             // 순간 RMS 추가
             RMS.add(Math.sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2]));
 
@@ -123,7 +180,7 @@ public class StepMonitor extends Service implements SensorEventListener {
                         } else {
                             // 5개 검사 후 local영역 최대값이 RMS평균을 넘는다면 걸음으로 체크
                             if (localMax > avgRMS)
-                                step++;
+                                steps++;
 
                             localMax = 0;
                             localCount = 0;
@@ -132,10 +189,10 @@ public class StepMonitor extends Service implements SensorEventListener {
                 }
 
                 appendLog("*** AVG : " + avgRMS);
-                appendLog("***>>>>>>>> STEP : " + step);
+                appendLog("***>>>>>>>> STEP : " + steps);
 
                 Log.d(LOGTAG, Double.toString(avgRMS));
-                Log.d(LOGTAG, ">>>STEP: " + Double.toString(step));
+                Log.d(LOGTAG, ">>>STEP: " + Double.toString(steps));
 
                 sendBroadcast(new Intent(MyService.MY_SERVICE_BROADCAST_TAG));
 
@@ -149,66 +206,6 @@ public class StepMonitor extends Service implements SensorEventListener {
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
-
-    /*
-    private void computeSteps(float[] values) {
-        double avgRms = 0;
-
-        if(minute_count>ONE_MINUTE_COUNT) {
-            totalStepCount += steps;
-            if (steps < MINUTE_PER_MAXIMUN_STEP ) {
-                //1분간 걸음수를 채우지 못함
-                intent.putExtra("isMoving",true);
-                intent.putExtra("steps", (int) totalStepCount);
-                sendBroadcast(intent);
-                totalStepCount = 0;
-            }
-            steps =0;
-            minute_count = 0;
-        }
-        // X, Y, Z
-        double rms = Math.sqrt(values[0] * values[0] + values[1] * values[1] + values[2] * values[2]);
-
-        //MainActivity.rmsText.append(rms + "\n");
-        // Log.d(">>> ", values[0] + ", " + values[1] + ", " + values[2] + ", " + rms);
-
-        if(rmsCount < NUMBER_OF_SAMPLES) {
-            // sampling
-            rmsArray[rmsCount] = rms;
-            rmsCount++;
-        } else {
-
-            double sum = 0;
-            for(double e : rmsArray) {
-                sum += e;
-            }
-
-            avgRms = sum / NUMBER_OF_SAMPLES;
-            Log.d(LOGTAG, "1sec avg rms: " + avgRms);
-
-
-            // step result
-            if(avgRms > AVG_RMS_THRESHOLD) {
-                steps += NUMBER_OF_STEPS_PER_SEC;
-
-                Log.d(LOGTAG, "steps: " + steps);
-
-                //Intent intent = new Intent(STEP_BROADCAST_TAG);
-
-                //sendBroadcast(intent);
-            }
-
-            // clear
-            rmsCount = 0;
-            for(int i = 0; i < NUMBER_OF_SAMPLES; i++) {
-                rmsArray[i] = 0;
-            }
-            rmsArray[0] = rms;
-            rmsCount++;
-        }
-    }
-    */
-
     public void appendLog(String msg) {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
@@ -221,4 +218,3 @@ public class StepMonitor extends Service implements SensorEventListener {
         beforeDate = new Date();
     }
 }
-

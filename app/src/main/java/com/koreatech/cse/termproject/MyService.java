@@ -2,16 +2,19 @@ package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.AlarmManager;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.GpsSatellite;
 import android.location.GpsStatus;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.net.wifi.ScanResult;
@@ -24,10 +27,13 @@ import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -58,20 +64,19 @@ public class MyService extends Service {
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
+    private String logSummaryPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/summary.txt";
+
     private PrintWriter logWriter;
+    private PrintWriter logSummaryWriter;
     private Date beforeDate = new Date();
+
+    // 근접 경보
+    private LocationListener locationListenerByProximity;
 
     // Alarm broadcast
     private AlarmManager alarmManager;
     private PendingIntent alarmPendingIntent;
     private BroadcastReceiver alarmBroadcastReceiver;
-
-    // 근접 경보
-    /*private PendingIntent proximityGroundPendingIntent;     // 운동장
-    private PendingIntent proximityTeldongPendingIntent;     // 텔동
-    private PendingIntent proximityComgongPendingIntent;     // 4공 잔디
-    private BroadcastReceiver proximityBroadcastReceiver;*/
-    private LocationListener locationListenerByProximity;
 
     // StepMonitor broadcast
     private BroadcastReceiver stepBroadcastReceiver;
@@ -85,6 +90,7 @@ public class MyService extends Service {
 
 
     public MyService() {
+
     }
 
     @Override
@@ -94,14 +100,15 @@ public class MyService extends Service {
         locationProvider = locationManager.getProvider(LocationManager.GPS_PROVIDER);
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-        if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
+        if(locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false)
             showExitDialog("GPS를 사용할 수 없습니다.");
-        if (wifiManager.isWifiEnabled() == false)
+        if(wifiManager.isWifiEnabled() == false)
             showExitDialog("와이파이를 사용할 수 없습니다.");
 
         // 로그 관련
         try {
-            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, true)));
+            logWriter = new PrintWriter(new BufferedWriter(new FileWriter(logPath, false)));
+            logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -124,20 +131,6 @@ public class MyService extends Service {
 
         // Alarm broadcast
         alarmPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, new Intent(ALARM_BROADCAST_TAG), 0);
-
-        // Proximity Alert
-        /*Intent groundIntent = new Intent(PROXIMITY_BROADCAST_TAG);
-        Intent teldongIntent = new Intent(PROXIMITY_BROADCAST_TAG);
-        Intent comgongIntent = new Intent(PROXIMITY_BROADCAST_TAG);*/
-
-        //groundIntent.putExtra("location", "ground");
-        //teldongIntent.putExtra("location", "teldong");
-        //comgongIntent.putExtra("location", "comgong");
-
-        //proximityGroundPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, groundIntent, 0);
-        //proximityTeldongPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, teldongIntent, 0);
-        //proximityComgongPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, comgongIntent, 0);
-
         initAlarm();
 
         isRunning = true;
@@ -149,7 +142,7 @@ public class MyService extends Service {
         stopDetectorOfInOutdoor();
 
         logWriter.close();
-
+        logSummaryWriter.close();
         isRunning = false;
     }
 
@@ -172,25 +165,13 @@ public class MyService extends Service {
     }
 
     public void startDetectOutdoorLocation() {
-        /**if(proximityBroadcastReceiver != null)
-            return;
-
-        proximityBroadcastReceiver = new ProximityBroadcastReceiver();*/
         locationListenerByProximity = new LocationListener();
 
-        //registerReceiver(proximityBroadcastReceiver, new IntentFilter(PROXIMITY_BROADCAST_TAG));
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000, 1, locationListenerByProximity);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        // 운동장
-        //locationManager.addProximityAlert(36.762581, 127.284527, 80, -1, proximityGroundPendingIntent);
-        // 텔동
-        //locationManager.addProximityAlert(36.764215, 127.282173, 50, -1, proximityTeldongPendingIntent);
-
-        //컴공
-        //locationManager.addProximityAlert(36.761369, 127.280265, 5, -1, proximityComgongPendingIntent);
     }
     public void stopDetectOutdoorLocation() {
         if(locationListenerByProximity == null)
@@ -199,18 +180,11 @@ public class MyService extends Service {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        //locationManager.removeProximityAlert(proximityGroundPendingIntent);
-        //locationManager.removeProximityAlert(proximityTeldongPendingIntent);
-        //locationManager.removeProximityAlert(proximityComgongPendingIntent);
-
-        /*unregisterReceiver(proximityBroadcastReceiver);
-        proximityBroadcastReceiver = null;*/
-
         locationManager.removeUpdates(locationListenerByProximity);
         locationListenerByProximity = null;
     }
 
-    private void startStepMonitor() {
+    public void startStepMonitor() {
         if(stepBroadcastReceiver != null)
             return;
 
@@ -239,7 +213,6 @@ public class MyService extends Service {
             return;
 
         Toast.makeText(getApplicationContext(), "탐지시작", Toast.LENGTH_SHORT).show();
-
         // NOTE GPS 먼저 검색을 시작함
         startGpsScan();
     }
@@ -328,12 +301,26 @@ public class MyService extends Service {
     public void appendLog(String msg) {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
-        long distantTime = (date.getTime() - date.getTime()) / 1000 / 60;
+        long distantTime = (date.getTime() - writeDate.getTime()) /  60000;
+        if(isMoving==true) {
+            MainActivity.locationInfo.totalSumMovingTime(distantTime);
+        }
+        else
+        {
+            MainActivity.locationInfo.timeCompare(distantTime, indoorLocationName);
+        }
+        try {
+            logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
 
-        msg = "[" + dateFormat.format(date) + "] " + msg;
+        msg = "["+ dateFormat.format(writeDate)+"-"+ dateFormat.format(date) + "] " + distantTime + "분 " + msg;
+        logSummaryWriter.write(LocationInfo.totalMovingTime + "\n" + LocationInfo.totalStepCount + "\n" + MainActivity.locationInfo.locationName + "\n" + MainActivity.locationInfo.time);
+        logSummaryWriter.flush();
 
         logWriter.println(msg);
         logWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         beforeDate = new Date();
 
         sendBroadcast(new Intent(MY_SERVICE_BROADCAST_TAG));
@@ -345,15 +332,34 @@ public class MyService extends Service {
             wifiManager.startScan();
         }
     }
-
+    int totalStepCount;
+    String indoorString;
+    Date writeDate;
+    boolean isMoving = false;
     class StepBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Toast.makeText(getApplicationContext(), intent.getBooleanExtra("ismoving",false)+"", Toast.LENGTH_SHORT).show();
-            Toast.makeText(getApplicationContext(), intent.getIntExtra("steps",0),Toast.LENGTH_SHORT).show();
+            totalStepCount = intent.getIntExtra("steps", 0);
+            writeDate = new Date();
+            writeDate.setTime(intent.getLongExtra("currentDate", 0));
+            isMoving = intent.getBooleanExtra("isMoving",true);
+            isMoving = intent.getBooleanExtra("isMoving",true);
+            if(isMoving==false)
+            {
+                indoorString = "정지";
+                startDetectorOfInOutdoor();
+            }
+            else
+            {
+                LocationInfo.totalSumStep(totalStepCount);
+                indoorString = "이동 "+totalStepCount +"걸음";
+                startDetectorOfInOutdoor();
+                stopStepMonitor();
+
+            }
         }
     }
-
+    String indoorLocationName = "";
     class WifiBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -370,22 +376,13 @@ public class MyService extends Service {
             });
 
             //boolean isIndoor = false;
-            String indoorLocationName = "모르는 실내";
+            indoorLocationName = "실내";
             String str = "";
 
             for (ScanResult scanResult : scanResultList) {
                 str += scanResult.SSID + "\n";
                 str += "  BSSID: " + scanResult.BSSID + "\n";
                 str += "  Level: " + scanResult.level + "\n\n";
-
-                // MCM랩
-                if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
-                    if (scanResult.level > -55) {
-                        //isIndoor = true;
-                        indoorLocationName = "MCM랩";
-                        //break;
-                    }
-                }
 
                 // A312
                 // NSTL 2.4GHz
@@ -470,23 +467,16 @@ public class MyService extends Service {
                         //break;
                     }
                 }
-
             }
 
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
 
             // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
-            appendLog("현재위치: " + indoorLocationName);
+            appendLog(indoorString +" "+indoorLocationName);
 
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
-        }
-    }
-
-    class ProximityBroadcastReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Toast.makeText(getApplicationContext(), intent.getStringExtra("location") + "접근 중", Toast.LENGTH_SHORT).show();
+            startStepMonitor();
         }
     }
 
@@ -510,8 +500,10 @@ public class MyService extends Service {
 
             if(count > 5) {
                 //logText.setText("GPS>> 실외판정됨.");
-                appendLog("GPS>> 실외판정됨." + count);
+                indoorLocationName = "실외";
+                appendLog(indoorString + " "+indoorLocationName);
                 stopDetectorOfInOutdoor();
+                startStepMonitor();
             } else {
                 if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
                     return;

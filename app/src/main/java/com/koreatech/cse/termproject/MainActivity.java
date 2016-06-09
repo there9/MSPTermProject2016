@@ -58,12 +58,10 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView summaryStepText;
     TextView totalStepTimeText;
     TextView maximumLocationText;
-    TextView logText;
     ListView logList;
+    public static LocationInfo locationInfo = new LocationInfo();
 
-    int step = 0;
 
-    Location lastLocation;
 
     ArrayAdapter<String> logListAdaptor;
 
@@ -78,21 +76,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     BroadcastReceiver myBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            logText.setText("");
-            if(intent.hasExtra("location")) {
-                lastLocation = intent.getParcelableExtra("location");
-                logText.append(lastLocation.getLatitude() + " / " + lastLocation.getLongitude() + "\n" +
-                        "운동장: " + intent.getFloatExtra("ground", -1) + "m\n" +
-                        "본부: " + intent.getFloatExtra("main", -1) + "m\n" +
-                        "4공: " + intent.getFloatExtra("comgong", -1) + "m\n" +
-                        "---------\n" +
-                        "오차: " + lastLocation.getAccuracy() + "m\n" +
-                        "---------\n");
-            }
             if(intent.hasExtra("error")) {
                 showExitDialog(intent.getStringExtra("error"));
             }
-            logText.append("걸음수: " + StepMonitor.step);
             readUpdateLog();
         }
     };
@@ -107,30 +93,18 @@ public class MainActivity extends Activity implements View.OnClickListener {
         summaryStepText = (TextView) findViewById(R.id.summaryStepText);
         totalStepTimeText = (TextView) findViewById(R.id.totalStepTimeText);
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
-        logText = (TextView) findViewById(R.id.logText);
         logList = (ListView) findViewById(R.id.logList);
         logListAdaptor = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
 
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
-        logText.setMovementMethod(new ScrollingMovementMethod());
         logList.setAdapter(logListAdaptor);
-
         readUpdateLog();
-
-        if(MyService.isRunning == false)
-            startService(new Intent(this, MyService.class));
-
-        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
-
-        startService(new Intent(this, StepMonitor.class));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
 
-        unbindService(serviceConnection);
-        stopService(new Intent(this, StepMonitor.class));
     }
 
     @Override
@@ -138,12 +112,38 @@ public class MainActivity extends Activity implements View.OnClickListener {
         super.onResume();
 
         registerReceiver(myBroadcastReceiver, new IntentFilter(MyService.MY_SERVICE_BROADCAST_TAG));
+
+        if(MyService.isRunning == false)
+            startService(new Intent(this, MyService.class));
+
+        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+
+        //readUpdateLog();
+
+        // Alarm setting
+        //initAlarm();
+
+        // Step Monitor
+        //startStepMonitor();
+
+        // Wifi scan setting
+        //startWifiScan();
+
+        // GPS status setting
+        //startGpsScan();
     }
     @Override
     protected void onPause() {
         super.onPause();
 
         unregisterReceiver(myBroadcastReceiver);
+
+        unbindService(serviceConnection);
+
+        // step monitor stop
+        /*stopStepMonitor();
+
+        stopDetectorOfInOutdoor();*/
     }
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -167,19 +167,19 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if(event.getAction() == MotionEvent.ACTION_DOWN) {
-            //myService.startDetectorOfInOutdoor();
-            myService.stopDetectOutdoorLocation();
-            myService.startDetectOutdoorLocation();
-        }
-        return false;
+        if(event.getAction() == MotionEvent.ACTION_DOWN)
+                myService.startStepMonitor();
+
+            return false;
     }
 
     public void readUpdateLog() {
         logListAdaptor.clear();
-
-        try {
-            String buffer = "";
+        summaryStepText.setText("Steps : " + LocationInfo.totalStepCount);
+        totalStepTimeText.setText("Moving Time : " + LocationInfo.totalMovingTime+"분");
+        maximumLocationText.setText("Top Place : " + MainActivity.locationInfo.locationName);
+            try {
+                String buffer = "";
 
             FileInputStream file = new FileInputStream(logPath);
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
@@ -202,6 +202,4 @@ public class MainActivity extends Activity implements View.OnClickListener {
         });
         alert.show();
     }
-
-
 }
