@@ -31,13 +31,13 @@ public class StepMonitor extends Service implements SensorEventListener {
     private PowerManager powerManager;
     private PowerManager.WakeLock wakeLock;
 
-    long prevPickTime = 0;
-    long curPickTime = 0;
-    long timeSum = 0;
+    long prevPickTime = 0;              // 이전 가속도 센서 검사 시간
+    long curPickTime = 0;               // 현재 가속도 센서 검사 시간
+    long timeSum = 0;                   // 가속도 센서 검사 시간의 합
 
-    int stepScanTime = 3000;
+    int stepScanTime = 3000;            // 스텝을 누적하고자하는 시간 (ms)
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
-    ArrayList<Double> RMS = new ArrayList<>();
+    ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
     int step = 0;
 
@@ -91,12 +91,15 @@ public class StepMonitor extends Service implements SensorEventListener {
 
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             curPickTime = event.timestamp;
+            // 가속도 측정 시간 누적
             timeSum += (curPickTime - prevPickTime) / 1000000;
             prevPickTime = curPickTime;
 
             // 순간 RMS 추가
             RMS.add(Math.sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2]));
 
+            // 가속도 측정(RMS를 누적한) 시간이 스텝 측정시간을 넘었다면
+            // 3초동안 RMS 검사를 함.
             if(timeSum > stepScanTime) {
                 Log.d(LOGTAG, stepScanTime + "ms post..");
 
@@ -107,15 +110,18 @@ public class StepMonitor extends Service implements SensorEventListener {
                 }
                 avgRMS /= RMS.size();
 
+                // RMS평균이 4.5를 넘었다면 (기준치)
                 if(avgRMS > 4.5) {
                     double localCount = 0;
                     double localMax = 0;
 
                     for (double e : RMS) {
+                        // local 영역 5개 검사
                         if (localCount < 5) {
                             localMax = e > localMax ? e : localMax;
                             localCount++;
                         } else {
+                            // 5개 검사 후 local영역 최대값이 RMS평균을 넘는다면 걸음으로 체크
                             if (localMax > avgRMS)
                                 step++;
 
