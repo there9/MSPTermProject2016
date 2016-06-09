@@ -40,7 +40,7 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    private static final int MINUTE_PER_MAXIMUN_STEP = 80; //80
+    private static final int MINUTE_PER_MAXIMUN_STEP = 10; //80
     private static final int ONE_MINUTE_COUNT = 150; ///900
     private static final int STOP_COUNT_FIVE = 4;
     int stopCount = 0;
@@ -105,7 +105,7 @@ public class StepMonitor extends Service implements SensorEventListener {
             // 가속도 측정 시간 누적
             timeSum += (curPickTime - prevPickTime) / 1000000;
             prevPickTime = curPickTime;
-            Log.d("a", "" + minute_count + "" + stopCount + " " + isMoving);
+            //Log.d("a", "" + minute_count + "" + stopCount + " " + isMoving);
             if(stopCount>STOP_COUNT_FIVE)
             {
                 if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>0)
@@ -120,9 +120,10 @@ public class StepMonitor extends Service implements SensorEventListener {
         if(minute_count>ONE_MINUTE_COUNT) {
             Log.d("a", "" + stopCount + " " + isMoving);
 
+            totalStepCount += steps;
+
                 if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
                     currentDate = new Date();
-                    totalStepCount += steps;
                     isMoving = true;
                     stopCount = 0;
                 }
