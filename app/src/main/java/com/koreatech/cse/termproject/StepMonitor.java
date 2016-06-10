@@ -40,8 +40,8 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    private static final int MINUTE_PER_MAXIMUN_STEP = 10; //80
-    private static final int ONE_MINUTE_COUNT = 150; ///900
+    private static final int MINUTE_PER_MAXIMUN_STEP = 15; //20
+    private static final int ONE_MINUTE_COUNT = 800; ///800
     private static final int STOP_COUNT_FIVE = 4;
     int stopCount = 0;
     private int minute_count=0;
@@ -115,19 +115,26 @@ public class StepMonitor extends Service implements SensorEventListener {
                 intent.putExtra("steps", (int) totalStepCount);
                 intent.putExtra("currentDate", currentDate.getTime());
                 sendBroadcast(intent);
+                }
             }
-        }
-        if(minute_count>ONE_MINUTE_COUNT) {
-            Log.d("a", "" + stopCount + " " + isMoving);
-
-            totalStepCount += steps;
+            if(minute_count>ONE_MINUTE_COUNT) {
+                Log.d("a", "" + stopCount + " " + isMoving);
+                totalStepCount += steps;
 
                 if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
                     currentDate = new Date();
                     isMoving = true;
                     stopCount = 0;
                 }
-                else if(totalStepCount > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
+                else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false) {
+                    if (stopCount == 0)
+                    {
+                        currentDate = new Date();
+                    }
+                    totalStepCount = 0;
+                    stopCount++;
+                }
+                if(totalStepCount > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
                 {
                     if(steps < MINUTE_PER_MAXIMUN_STEP)
                     {
@@ -141,14 +148,7 @@ public class StepMonitor extends Service implements SensorEventListener {
                     }
                     stopCount = 0;
                 }
-                else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false) {
-                    if (stopCount == 0)
-                    {
-                        currentDate = new Date();
-                    }
-                    totalStepCount = 0;
-                    stopCount++;
-                }
+
                 steps =0;
                 minute_count = 0;
             }
@@ -192,7 +192,9 @@ public class StepMonitor extends Service implements SensorEventListener {
                 appendLog("*** AVG : " + avgRMS);
                 appendLog("***>>>>>>>> STEP : " + steps);
 
+                Log.d(LOGTAG, "" + timeSum);
                 Log.d(LOGTAG, Double.toString(avgRMS));
+                Log.d(LOGTAG, ""+minute_count);
                 Log.d(LOGTAG, ">>>STEP: " + Double.toString(steps));
 
                 sendBroadcast(new Intent(MyService.MY_SERVICE_BROADCAST_TAG));
