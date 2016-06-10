@@ -59,6 +59,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView totalStepTimeText;
     TextView maximumLocationText;
     ListView logList;
+    TextView logText;
     public static LocationInfo locationInfo = new LocationInfo();
 
 
@@ -76,6 +77,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     BroadcastReceiver myBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            if(intent.hasExtra("location")) {
+                logText.setText("4공: " + intent.getFloatExtra("comgong", -1));
+            }
             if(intent.hasExtra("error")) {
                 showExitDialog(intent.getStringExtra("error"));
             }
@@ -95,6 +99,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         maximumLocationText = (TextView) findViewById(R.id.maximunLocationText);
         logList = (ListView) findViewById(R.id.logList);
         logListAdaptor = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        logText = (TextView) findViewById(R.id.logText);
 
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
         logList.setAdapter(logListAdaptor);

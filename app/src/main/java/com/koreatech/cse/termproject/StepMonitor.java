@@ -40,13 +40,13 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    private static final int MINUTE_PER_MAXIMUN_STEP = 15; //20
+    private static final int MINUTE_PER_MAXIMUN_STEP = 20; //20
     private static final int ONE_MINUTE_COUNT = 800; ///800
     private static final int STOP_COUNT_FIVE = 4;
     int stopCount = 0;
     private int minute_count=0;
     Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
-    private int totalStepCount = 0;
+    public static int totalStepCount = 0;
     private boolean isMoving =false;
     Date currentDate;
 
@@ -145,6 +145,12 @@ public class StepMonitor extends Service implements SensorEventListener {
                         totalStepCount = 0;
                         sendBroadcast(intent);
                         isMoving = false;
+                    } else {
+                        // 계속 이동 중인 상황
+                        Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
+                        intent.putExtra("continue_moving", true);
+                        intent.putExtra("steps", (int) totalStepCount);
+                        sendBroadcast(intent);
                     }
                     stopCount = 0;
                 }

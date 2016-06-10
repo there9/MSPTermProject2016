@@ -2,19 +2,16 @@ package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.AlarmManager;
-import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.GpsSatellite;
 import android.location.GpsStatus;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.net.wifi.ScanResult;
@@ -27,13 +24,10 @@ import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -45,6 +39,7 @@ public class MyService extends Service {
     public final static String MY_SERVICE_BROADCAST_TAG = "com.koreatech.cse.termproject.service";
     private final static String ALARM_BROADCAST_TAG = "com.koreatech.cse.termproject.alarm";
     private final static String PROXIMITY_BROADCAST_TAG = "com.koreatech.cse.termproject.proximity";
+    public final static String DETECT_OUTDOOR_BROADCAST_TAG = "com.koreatech.cse.termproject.detect_outdoor";
 
     public static boolean isRunning;
 
@@ -72,6 +67,7 @@ public class MyService extends Service {
 
     // 근접 경보
     private LocationListener locationListenerByProximity;
+
 
     // Alarm broadcast
     private AlarmManager alarmManager;
@@ -254,6 +250,8 @@ public class MyService extends Service {
             return;
         }
 
+        knownOutdoorLocation = "";
+
         gpsStatusListener = new GpsStatusListener();
         locationListener = new LocationListener();
 
@@ -298,11 +296,15 @@ public class MyService extends Service {
         wifiBroadcastReceiver = null;
     }
 
-    public void appendLog(String msg) {
+    public void appendLog(String msg, int step) {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
         long distantTime = (date.getTime() - writeDate.getTime()) /  60000;
+        LocationInfo.totalSumStep(step);
+        movingTotalCount = 0;
+
         if(isMoving==true) {
+                             // 요약정보 - 총 걸음수
             MainActivity.locationInfo.totalSumMovingTime(distantTime);
         }
         else
@@ -332,30 +334,44 @@ public class MyService extends Service {
             wifiManager.startScan();
         }
     }
-    int totalStepCount;
+    int localStepCount;
+    int movingTotalCount = 0;
     String indoorString;
     Date writeDate;
     boolean isMoving = false;
+    boolean isContinueMoving = false;
     class StepBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            totalStepCount = intent.getIntExtra("steps", 0);
-            writeDate = new Date();
-            writeDate.setTime(intent.getLongExtra("currentDate", 0));
-            isMoving = intent.getBooleanExtra("isMoving",true);
-            isMoving = intent.getBooleanExtra("isMoving",true);
-            if(isMoving==false)
-            {
-                indoorString = "정지";
-                startDetectorOfInOutdoor();
-            }
-            else
-            {
-                LocationInfo.totalSumStep(totalStepCount);
-                indoorString = "이동 "+totalStepCount +"걸음";
-                startDetectorOfInOutdoor();
-                stopStepMonitor();
+            // 계속 이동중인 상황"
+            if(intent.hasExtra("continue_moving") && intent.getBooleanExtra("continue_moving", false) == true) {
+                if(isContinueMoving == false)
+                    writeDate = new Date();
 
+                isContinueMoving = true;
+
+                movingTotalCount += localStepCount;
+                localStepCount = intent.getIntExtra("steps", 0);
+
+                startDetectorOfInOutdoor();
+            } else {
+                isContinueMoving = false;
+
+                movingTotalCount += localStepCount;
+                localStepCount = intent.getIntExtra("steps", 0);
+
+                writeDate.setTime(intent.getLongExtra("currentDate", 0));
+                isMoving = intent.getBooleanExtra("isMoving", true);
+                if (isMoving == false) {
+                    indoorString = "정지";
+                    startDetectorOfInOutdoor();
+                } else {
+                    //LocationInfo.totalSumStep(localStepCount);
+                    //indoorString = "이동 " + movingTotalCount + "걸음";
+                    startDetectorOfInOutdoor();
+                    stopStepMonitor();
+
+                }
             }
         }
     }
@@ -375,8 +391,10 @@ public class MyService extends Service {
                 }
             });
 
+            String tmpLocationName;
+
             //boolean isIndoor = false;
-            indoorLocationName = "실내";
+            tmpLocationName = "실내";
             String str = "";
 
             for (ScanResult scanResult : scanResultList) {
@@ -384,12 +402,21 @@ public class MyService extends Service {
                 str += "  BSSID: " + scanResult.BSSID + "\n";
                 str += "  Level: " + scanResult.level + "\n\n";
 
+                // MCM랩
+                if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
+                    if (scanResult.level > -55) {
+                        //isIndoor = true;
+                        tmpLocationName = "MCM랩";
+                        //break;
+                    }
+                }
+
                 // A312
                 // NSTL 2.4GHz
                 if (scanResult.BSSID.equalsIgnoreCase("00:26:66:cc:e3:8c")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312";
+                        tmpLocationName = "A312";
                         //break;
                     }
                 }
@@ -397,7 +424,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("90:9f:33:cd:28:62")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312";
+                        tmpLocationName = "A312";
                         //break;
                     }
                 }
@@ -405,7 +432,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("50:1c:bf:41:cf:20")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312";
+                        tmpLocationName = "A312";
                         //break;
                     }
                 }
@@ -413,7 +440,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("50:1c:bf:41:cf:21")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "A312";
+                        tmpLocationName = "A312";
                         //break;
                     }
                 }
@@ -423,7 +450,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:ce")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -431,7 +458,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:cf")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -439,7 +466,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:c0")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -447,7 +474,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("a4:18:75:58:77:d0")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -455,7 +482,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:9e:a6:c1")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -463,7 +490,7 @@ public class MyService extends Service {
                 if (scanResult.BSSID.equalsIgnoreCase("20:3a:07:49:5c:ee")) {
                     if (scanResult.level > -65) {
                         //isIndoor = true;
-                        indoorLocationName = "다산";
+                        tmpLocationName = "다산";
                         //break;
                     }
                 }
@@ -472,7 +499,30 @@ public class MyService extends Service {
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
 
             // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
-            appendLog(indoorString +" "+indoorLocationName);
+
+            if (isMoving == false) {
+                indoorString = "정지";
+            } else {
+                indoorString = "이동 " + localStepCount + "걸음";
+            }
+
+            if(isContinueMoving == false) {
+                indoorLocationName = tmpLocationName;
+                appendLog(indoorString + " " + indoorLocationName, localStepCount);
+            } else {
+                // 끊임없이 이동중 - 다른 장소로 왔다
+                if (indoorLocationName.equals(tmpLocationName) == false) {
+                    indoorString = "이동 " + localStepCount + "걸음";
+                    //LocationInfo.totalSumStep(localStepCount);
+                    if(!indoorLocationName.isEmpty()) {
+                        appendLog(indoorString + " " + tmpLocationName, localStepCount);
+
+                        StepMonitor.totalStepCount = 0;
+                    }
+                    indoorLocationName = tmpLocationName;
+                    writeDate = new Date();
+                }
+            }
 
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
@@ -500,10 +550,29 @@ public class MyService extends Service {
 
             if(count > 5) {
                 //logText.setText("GPS>> 실외판정됨.");
-                indoorLocationName = "실외";
-                appendLog(indoorString + " "+indoorLocationName);
-                stopDetectorOfInOutdoor();
-                startStepMonitor();
+                /*String tmpLocationName;
+                if(knownOutdoorLocation.isEmpty())
+                    tmpLocationName = "실외";
+                else
+                    tmpLocationName = knownOutdoorLocation;
+
+                if(isContinueMoving == false) {
+                    indoorLocationName = tmpLocationName;
+                    appendLog(indoorString + " " + indoorLocationName);
+                } else {
+                    if(indoorLocationName.equals(tmpLocationName) == false) {
+                        indoorString = "이동 " + localStepCount + "걸음";
+                        if(!indoorLocationName.isEmpty()) {
+                            appendLog(indoorString + " " + tmpLocationName);
+
+                            StepMonitor.totalStepCount = 0;
+                        }
+                        indoorLocationName = tmpLocationName;
+                        writeDate = new Date();
+                    }
+                }
+                stopDetectorOfInOutdoor();*/
+                //startStepMonitor();
             } else {
                 if(System.currentTimeMillis() - gpsStartTime < GPS_WAIT_MILLIS) {
                     return;
@@ -520,6 +589,7 @@ public class MyService extends Service {
         }
     }
 
+    String knownOutdoorLocation = "";
     class LocationListener implements android.location.LocationListener {
         @Override
         public void onLocationChanged(Location location) {
@@ -528,7 +598,53 @@ public class MyService extends Service {
             intent.putExtra("ground", location.distanceTo(sportGroundLocation));
             intent.putExtra("main", location.distanceTo(universityMainLocation));
             intent.putExtra("comgong", location.distanceTo(comgongLocation));
+
+            // 운동장 거리
+            if(location.distanceTo(sportGroundLocation) < 80)
+                knownOutdoorLocation = "운동장";
+            // 대학본부
+            if(location.distanceTo(universityMainLocation) < 50)
+                knownOutdoorLocation = "대학본부";
+            // 4공
+            if(location.distanceTo(comgongLocation) < 20)
+                knownOutdoorLocation = "4공학관";
+
+            Toast.makeText(getApplicationContext(), knownOutdoorLocation + " / " + location.getAccuracy(), Toast.LENGTH_SHORT).show();
+
             sendBroadcast(intent);
+
+            if(location.getAccuracy() < 100) {
+                String tmpLocationName;
+
+                if (isMoving == false) {
+                    indoorString = "정지";
+                } else {
+                    indoorString = "이동 " + localStepCount + "걸음";
+                }
+
+                if (knownOutdoorLocation.isEmpty())
+                    tmpLocationName = "실외";
+                else
+                    tmpLocationName = knownOutdoorLocation;
+
+                if (isContinueMoving == false) {
+                    indoorLocationName = tmpLocationName;
+                    appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                } else {
+                    if (indoorLocationName.equals(tmpLocationName) == false) {
+                        indoorString = "이동 " + localStepCount + "걸음";
+                        if (!indoorLocationName.isEmpty()) {
+                            appendLog(indoorString + " " + tmpLocationName, localStepCount);
+
+                            StepMonitor.totalStepCount = 0;
+                        }
+                        indoorLocationName = tmpLocationName;
+                        writeDate = new Date();
+                    }
+                }
+                stopDetectorOfInOutdoor();
+                startStepMonitor();
+            }
         }
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) { }
