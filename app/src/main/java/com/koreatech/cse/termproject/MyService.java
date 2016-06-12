@@ -300,32 +300,34 @@ public class MyService extends Service {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
         long distantTime = (date.getTime() - writeDate.getTime()) /  60000;
-        LocationInfo.totalSumStep(step);
-        movingTotalCount = 0;
-
-        if(isMoving==true) {
-                             // 요약정보 - 총 걸음수
-            MainActivity.locationInfo.totalSumMovingTime(distantTime);
+        if(isContinueMoving == true) {
+            StepMonitor.currentDate = new Date();
         }
-        else
-        {
+        Log.d("a", distantTime + "");
+        //if(distantTime>0) {
+            LocationInfo.totalSumStep(step);
+            movingTotalCount = 0;
+            if(isMoving == true || isContinueMoving ==true) {
+                MainActivity.locationInfo.totalSumMovingTime(distantTime);
+            }
             MainActivity.locationInfo.timeCompare(distantTime, indoorLocationName);
-        }
-        try {
-            logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
 
-        msg = "["+ dateFormat.format(writeDate)+"-"+ dateFormat.format(date) + "] " + distantTime + "분 " + msg;
-        logSummaryWriter.write(LocationInfo.totalMovingTime + "\n" + LocationInfo.totalStepCount + "\n" + MainActivity.locationInfo.locationName + "\n" + MainActivity.locationInfo.time);
-        logSummaryWriter.flush();
+            try {
+                logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
 
-        logWriter.println(msg);
-        logWriter.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        beforeDate = new Date();
+                msg = "[" + dateFormat.format(writeDate) + "-" + dateFormat.format(date) + "] " + distantTime + "분 " + msg;
+                logSummaryWriter.write(LocationInfo.totalMovingTime + "\n" + LocationInfo.totalStepCount + "\n" + MainActivity.locationInfo.locationName + "\n" + MainActivity.locationInfo.time);
+                logSummaryWriter.flush();
 
-        sendBroadcast(new Intent(MY_SERVICE_BROADCAST_TAG));
+                logWriter.println(msg);
+                logWriter.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            beforeDate = new Date();
+
+            sendBroadcast(new Intent(MY_SERVICE_BROADCAST_TAG));
+        //}
     }
 
     class AlarmBroadcastReceiver extends BroadcastReceiver {
@@ -359,7 +361,7 @@ public class MyService extends Service {
 
                 movingTotalCount += localStepCount;
                 localStepCount = intent.getIntExtra("steps", 0);
-
+                writeDate = new Date();
                 writeDate.setTime(intent.getLongExtra("currentDate", 0));
                 isMoving = intent.getBooleanExtra("isMoving", true);
                 if (isMoving == false) {
@@ -376,6 +378,7 @@ public class MyService extends Service {
         }
     }
     String indoorLocationName = "";
+
     class WifiBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -391,12 +394,10 @@ public class MyService extends Service {
                 }
             });
 
-            String tmpLocationName;
 
+            String tmpLocationName = "실내";
             //boolean isIndoor = false;
-            tmpLocationName = "실내";
             String str = "";
-
             for (ScanResult scanResult : scanResultList) {
                 str += scanResult.SSID + "\n";
                 str += "  BSSID: " + scanResult.BSSID + "\n";
@@ -496,6 +497,7 @@ public class MyService extends Service {
                 }
             }
 
+            Toast.makeText(getApplicationContext(),tmpLocationName+" "+indoorLocationName,Toast.LENGTH_SHORT).show();
             //logText.setText((isIndoor ? "현재위치: MCN랩" : "현재위치: 모르는 실내") + "\n" + str);
 
             // NOTE 이미 이 단계까지 왔다는건 GPS(실외) 판단이 실패하여 넘어왔으므로 실내라고 판단함
@@ -508,22 +510,44 @@ public class MyService extends Service {
 
             if(isContinueMoving == false) {
                 indoorLocationName = tmpLocationName;
-                appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                if(isMoving==true&&(indoorLocationName =="실외"||indoorLocationName =="실내"))
+                {
+                    appendLog(indoorString + " ", localStepCount);
+                }
+                else
+                {
+                    appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                }
             } else {
                 // 끊임없이 이동중 - 다른 장소로 왔다
                 if (indoorLocationName.equals(tmpLocationName) == false) {
-                    indoorString = "이동 " + localStepCount + "걸음";
-                    //LocationInfo.totalSumStep(localStepCount);
-                    if(!indoorLocationName.isEmpty()) {
-                        appendLog(indoorString + " " + tmpLocationName, localStepCount);
 
+                    //LocationInfo.totalSumStep(localStepCount);
+                    if(indoorLocationName.isEmpty()==false)
+                    {
+                        indoorString = "이동 " + localStepCount + "걸음";
+                        if(indoorLocationName !="실내"&&indoorLocationName !="실외")
+                        {
+                            appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                        }
+                        else
+                        {
+                            if(tmpLocationName !="실내"&&tmpLocationName!="실외" )
+                            {
+                                appendLog(indoorString + " " + tmpLocationName, localStepCount);
+                            }
+                            else
+                            {
+                                appendLog(indoorString + " ", localStepCount);
+                            }
+                        }
                         StepMonitor.totalStepCount = 0;
                     }
-                    indoorLocationName = tmpLocationName;
                     writeDate = new Date();
+                    indoorLocationName = tmpLocationName;
+
                 }
             }
-
             Log.d("WIFI", str);
             stopDetectorOfInOutdoor();
             startStepMonitor();
@@ -598,7 +622,7 @@ public class MyService extends Service {
             intent.putExtra("ground", location.distanceTo(sportGroundLocation));
             intent.putExtra("main", location.distanceTo(universityMainLocation));
             intent.putExtra("comgong", location.distanceTo(comgongLocation));
-
+            knownOutdoorLocation = "실외";
             // 운동장 거리
             if(location.distanceTo(sportGroundLocation) < 80)
                 knownOutdoorLocation = "운동장";
@@ -614,7 +638,8 @@ public class MyService extends Service {
             sendBroadcast(intent);
 
             if(location.getAccuracy() < 100) {
-                String tmpLocationName;
+                String tmpLocationName = knownOutdoorLocation;
+
 
                 if (isMoving == false) {
                     indoorString = "정지";
@@ -622,26 +647,48 @@ public class MyService extends Service {
                     indoorString = "이동 " + localStepCount + "걸음";
                 }
 
-                if (knownOutdoorLocation.isEmpty())
-                    tmpLocationName = "실외";
-                else
-                    tmpLocationName = knownOutdoorLocation;
-
-                if (isContinueMoving == false) {
+                if(isContinueMoving == false) {
                     indoorLocationName = tmpLocationName;
-                    appendLog(indoorString + " " + indoorLocationName, localStepCount);
-                } else {
-                    if (indoorLocationName.equals(tmpLocationName) == false) {
-                        indoorString = "이동 " + localStepCount + "걸음";
-                        if (!indoorLocationName.isEmpty()) {
-                            appendLog(indoorString + " " + tmpLocationName, localStepCount);
 
+                    if(isMoving==true&&(indoorLocationName =="실외"||indoorLocationName =="실내"))
+                    {
+                        appendLog(indoorString + " ", localStepCount);
+                    }
+                    else
+                    {
+                        appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                    }
+                } else {
+                    // 끊임없이 이동중 - 다른 장소로 왔다
+                    if (indoorLocationName.equals(tmpLocationName) == false) {
+
+                        //LocationInfo.totalSumStep(localStepCount);
+                        if(indoorLocationName.isEmpty()==false)
+                        {
+                            indoorString = "이동 " + localStepCount + "걸음";
+                            if(indoorLocationName !="실내"&&indoorLocationName !="실외")
+                            {
+                                appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                            }
+                            else
+                            {
+                                if(tmpLocationName !="실내"&&tmpLocationName!="실외" )
+                                {
+                                    appendLog(indoorString + " " + tmpLocationName, localStepCount);
+                                }
+                                else
+                                {
+                                    appendLog(indoorString + " ", localStepCount);
+                                }
+                            }
                             StepMonitor.totalStepCount = 0;
                         }
-                        indoorLocationName = tmpLocationName;
                         writeDate = new Date();
+                        indoorLocationName = tmpLocationName;
+
                     }
                 }
+
                 stopDetectorOfInOutdoor();
                 startStepMonitor();
             }

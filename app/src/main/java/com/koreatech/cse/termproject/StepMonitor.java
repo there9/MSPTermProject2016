@@ -41,14 +41,14 @@ public class StepMonitor extends Service implements SensorEventListener {
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
     private static final int MINUTE_PER_MAXIMUN_STEP = 20; //20
-    private static final int ONE_MINUTE_COUNT = 800; ///800
-    private static final int STOP_COUNT_FIVE = 4;
+    private static final int ONE_MINUTE_COUNT = 950; ///800
+    private static final int STOP_COUNT_FIVE = 5;
     int stopCount = 0;
     private int minute_count=0;
     Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
     public static int totalStepCount = 0;
     private boolean isMoving =false;
-    Date currentDate;
+    static Date currentDate = new Date();
 
     public static int steps = 0;
 
@@ -106,52 +106,62 @@ public class StepMonitor extends Service implements SensorEventListener {
             timeSum += (curPickTime - prevPickTime) / 1000000;
             prevPickTime = curPickTime;
             //Log.d("a", "" + minute_count + "" + stopCount + " " + isMoving);
+
             if(stopCount>STOP_COUNT_FIVE)
             {
+
                 if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>0)
                 {
                     stopCount = 0;
-                        intent.putExtra("isMoving", false);
-                intent.putExtra("steps", (int) totalStepCount);
-                intent.putExtra("currentDate", currentDate.getTime());
-                sendBroadcast(intent);
+                    intent.putExtra("isMoving", false);
+                    intent.putExtra("steps", (int) totalStepCount);
+                    intent.putExtra("currentDate", currentDate.getTime());
+                    intent.putExtra("continue_moving", false);
+                    sendBroadcast(intent);
                 }
             }
+            if(minute_count>(ONE_MINUTE_COUNT/3)||minute_count>(ONE_MINUTE_COUNT/3*2))
+            {
+                if(steps < 5 && isMoving==true)
+                {
+                    intent.putExtra("currentDate", currentDate.getTime());
+                    intent.putExtra("continue_moving", false);
+                    intent.putExtra("isMoving", true);
+                    intent.putExtra("steps", (int) totalStepCount);
+                    totalStepCount = 0;
+                    sendBroadcast(intent);
+                    Toast.makeText(getApplicationContext(), "이동 멈춤", Toast.LENGTH_SHORT).show();
+                    isMoving = false;
+                    stopCount = 0;
+                }
+            }
+
             if(minute_count>ONE_MINUTE_COUNT) {
                 Log.d("a", "" + stopCount + " " + isMoving);
                 totalStepCount += steps;
-
                 if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
                     currentDate = new Date();
                     isMoving = true;
                     stopCount = 0;
+                    Toast.makeText(getApplication(), "이동시작", Toast.LENGTH_SHORT).show();
                 }
                 else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false) {
                     if (stopCount == 0)
                     {
                         currentDate = new Date();
                     }
+                    Toast.makeText(getApplication(), "정지상태", Toast.LENGTH_SHORT).show();
                     totalStepCount = 0;
                     stopCount++;
                 }
-                if(totalStepCount > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
+                else if(steps > MINUTE_PER_MAXIMUN_STEP && isMoving==true)
                 {
-                    if(steps < MINUTE_PER_MAXIMUN_STEP)
-                    {
-                        Date nowDate = new Date();
-                        intent.putExtra("currentDate", currentDate.getTime());
-                        intent.putExtra("isMoving", true);
-                        intent.putExtra("steps", (int) totalStepCount);
-                        totalStepCount = 0;
-                        sendBroadcast(intent);
-                        isMoving = false;
-                    } else {
-                        // 계속 이동 중인 상황
-                        Intent intent = new Intent(StepMonitor.STEP_BROADCAST_TAG);
-                        intent.putExtra("continue_moving", true);
-                        intent.putExtra("steps", (int) totalStepCount);
-                        sendBroadcast(intent);
-                    }
+                    // 계속 이동 중인 상황
+                    intent.putExtra("currentDate", currentDate.getTime());
+                    intent.putExtra("continue_moving", true);
+                    intent.putExtra("steps", (int) totalStepCount);
+                    Toast.makeText(getApplication(), "이동중입니다.", Toast.LENGTH_SHORT).show();
+                    sendBroadcast(intent);
                     stopCount = 0;
                 }
 

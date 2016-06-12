@@ -68,6 +68,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     // 로그 관련
     private String logPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/log.txt";
+    private String logSummaryPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/summary.txt";
     private PrintWriter logWriter;
     private Date beforeDate = new Date();
 
@@ -185,13 +186,18 @@ public class MainActivity extends Activity implements View.OnClickListener {
         maximumLocationText.setText("Top Place : " + MainActivity.locationInfo.locationName);
             try {
                 String buffer = "";
+                FileInputStream file = new FileInputStream(logPath);
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
+                while ((buffer = bufferedReader.readLine()) != null) {
+                    logListAdaptor.add(buffer);
+                }
+                file = new FileInputStream(logSummaryPath);
+                bufferedReader = new BufferedReader(new InputStreamReader(file));
+                totalStepTimeText.setText("Moving Time : " + bufferedReader.readLine()+"분");
+                summaryStepText.setText("Steps : " + bufferedReader.readLine());
+                maximumLocationText.setText("Top Place : " + bufferedReader.readLine());
 
-            FileInputStream file = new FileInputStream(logPath);
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file));
-            while ((buffer = bufferedReader.readLine()) != null) {
-                logListAdaptor.add(buffer);
-            }
-        } catch (Exception e) {
+            } catch (Exception e) {
             e.printStackTrace();
         }
     }
