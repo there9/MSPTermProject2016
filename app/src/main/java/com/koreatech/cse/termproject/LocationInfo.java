@@ -5,6 +5,7 @@ public class LocationInfo {
     long time = -5;
     static int totalStepCount =0;
     static long totalMovingTime =0;
+
     LocationInfo() {
 
     }

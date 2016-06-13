@@ -133,9 +133,27 @@ public class MyService extends Service {
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        StepMonitor.steps = 0;
+        StepMonitor.totalStepCount = 0;
+        StepMonitor.currentDate = new Date();
+
+        LocationInfo.totalStepCount = 0;
+        LocationInfo.totalMovingTime = 0;
+
+        startStepMonitor();
+
+        Toast.makeText(getApplicationContext(), "서비스 시작됨", Toast.LENGTH_SHORT).show();
+
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
     public void onDestroy() {
         stopStepMonitor();
         stopDetectorOfInOutdoor();
+
+        Toast.makeText(getApplicationContext(), "서비스 종료됨", Toast.LENGTH_SHORT).show();
 
         logWriter.close();
         logSummaryWriter.close();
@@ -288,6 +306,7 @@ public class MyService extends Service {
 
         wifiManager.startScan();
     }
+    int savestep = 0;
     public void stopWifiScan() {
         if(wifiBroadcastReceiver == null)
             return;
@@ -299,15 +318,15 @@ public class MyService extends Service {
     public void appendLog(String msg, int step) {
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm");
-        long distantTime = (date.getTime() - writeDate.getTime()) /  60000;
-        if(isContinueMoving == true) {
+        long distantTime = (date.getTime() - writeDate.getTime()) / 60000;
+        if (isContinueMoving == true) {
             StepMonitor.currentDate = new Date();
         }
         Log.d("a", distantTime + "");
-        //if(distantTime>0) {
+        if (distantTime > 0) {
             LocationInfo.totalSumStep(step);
             movingTotalCount = 0;
-            if(isMoving == true || isContinueMoving ==true) {
+            if (isMoving == true || isContinueMoving == true) {
                 MainActivity.locationInfo.totalSumMovingTime(distantTime);
             }
             MainActivity.locationInfo.timeCompare(distantTime, indoorLocationName);
@@ -325,9 +344,13 @@ public class MyService extends Service {
                 e.printStackTrace();
             }
             beforeDate = new Date();
-
+            savestep = 0;
             sendBroadcast(new Intent(MY_SERVICE_BROADCAST_TAG));
-        //}
+        }
+        else
+        {
+            savestep += step;
+        }
     }
 
     class AlarmBroadcastReceiver extends BroadcastReceiver {
@@ -404,13 +427,13 @@ public class MyService extends Service {
                 str += "  Level: " + scanResult.level + "\n\n";
 
                 // MCM랩
-                if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
+                /*if (scanResult.BSSID.equalsIgnoreCase("64:e5:99:23:d3:a4")) {
                     if (scanResult.level > -55) {
                         //isIndoor = true;
                         tmpLocationName = "MCM랩";
                         //break;
                     }
-                }
+                }*/
 
                 // A312
                 // NSTL 2.4GHz
@@ -529,6 +552,8 @@ public class MyService extends Service {
                         if(indoorLocationName !="실내"&&indoorLocationName !="실외")
                         {
                             appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                            StepMonitor.totalStepCount = savestep;
+                            writeDate = new Date();
                         }
                         else
                         {
@@ -536,14 +561,12 @@ public class MyService extends Service {
                             {
                                 appendLog(indoorString + " " + tmpLocationName, localStepCount);
                             }
-                            else
-                            {
-                                appendLog(indoorString + " ", localStepCount);
-                            }
+                            StepMonitor.totalStepCount = savestep;
+                            writeDate = new Date();
                         }
-                        StepMonitor.totalStepCount = 0;
+
                     }
-                    writeDate = new Date();
+
                     indoorLocationName = tmpLocationName;
 
                 }
@@ -630,8 +653,8 @@ public class MyService extends Service {
             if(location.distanceTo(universityMainLocation) < 50)
                 knownOutdoorLocation = "대학본부";
             // 4공
-            if(location.distanceTo(comgongLocation) < 20)
-                knownOutdoorLocation = "4공학관";
+            /*if(location.distanceTo(comgongLocation) < 20)
+                knownOutdoorLocation = "4공학관";*/
 
             Toast.makeText(getApplicationContext(), knownOutdoorLocation + " / " + location.getAccuracy(), Toast.LENGTH_SHORT).show();
 
@@ -669,21 +692,20 @@ public class MyService extends Service {
                             if(indoorLocationName !="실내"&&indoorLocationName !="실외")
                             {
                                 appendLog(indoorString + " " + indoorLocationName, localStepCount);
+                                StepMonitor.totalStepCount = savestep;
+                                writeDate = new Date();
                             }
                             else
                             {
                                 if(tmpLocationName !="실내"&&tmpLocationName!="실외" )
                                 {
                                     appendLog(indoorString + " " + tmpLocationName, localStepCount);
-                                }
-                                else
-                                {
-                                    appendLog(indoorString + " ", localStepCount);
+                                    StepMonitor.totalStepCount = savestep;
+                                    writeDate = new Date();
                                 }
                             }
-                            StepMonitor.totalStepCount = 0;
                         }
-                        writeDate = new Date();
+
                         indoorLocationName = tmpLocationName;
 
                     }

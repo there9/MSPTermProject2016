@@ -30,6 +30,7 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -60,6 +61,9 @@ public class MainActivity extends Activity implements View.OnClickListener {
     TextView maximumLocationText;
     ListView logList;
     TextView logText;
+    Button startBtn;
+    Button stopBtn;
+
     public static LocationInfo locationInfo = new LocationInfo();
 
 
@@ -101,10 +105,36 @@ public class MainActivity extends Activity implements View.OnClickListener {
         logList = (ListView) findViewById(R.id.logList);
         logListAdaptor = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
         logText = (TextView) findViewById(R.id.logText);
+        startBtn = (Button) findViewById(R.id.startBtn);
+        stopBtn = (Button) findViewById(R.id.stopBtn);
+
+        startBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(MyService.isRunning == false) {
+                    startService(new Intent(getApplicationContext(), MyService.class));
+                    bindService(new Intent(getApplicationContext(), MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
+                    locationInfo = new LocationInfo();
+                }
+                updateBtn();
+            }
+        });
+
+        stopBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (MyService.isRunning == true) {
+                    unbindService(serviceConnection);
+                    stopService(new Intent(getApplicationContext(), MyService.class));
+                }
+                stopBtn.setVisibility(View.INVISIBLE);
+                startBtn.setVisibility(View.VISIBLE);
+                //updateBtn();
+            }
+        });
 
         todayText.setText((new SimpleDateFormat("yyyy년 M월 dd일", java.util.Locale.getDefault()).format(new Date())));
         logList.setAdapter(logListAdaptor);
-        readUpdateLog();
     }
 
     @Override
@@ -113,18 +143,27 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     }
 
+    public void updateBtn() {
+        if(MyService.isRunning == true) {
+            startBtn.setVisibility(View.INVISIBLE);
+            stopBtn.setVisibility(View.VISIBLE);
+        } else {
+            stopBtn.setVisibility(View.INVISIBLE);
+            startBtn.setVisibility(View.VISIBLE);
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
 
         registerReceiver(myBroadcastReceiver, new IntentFilter(MyService.MY_SERVICE_BROADCAST_TAG));
 
-        if(MyService.isRunning == false)
-            startService(new Intent(this, MyService.class));
+        if(MyService.isRunning == true)
+            bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
 
-        bindService(new Intent(this, MyService.class), serviceConnection, Context.BIND_AUTO_CREATE);
-
-        //readUpdateLog();
+        updateBtn();
+        readUpdateLog();
 
         // Alarm setting
         //initAlarm();
@@ -144,7 +183,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
         unregisterReceiver(myBroadcastReceiver);
 
-        unbindService(serviceConnection);
+        if(MyService.isRunning == true)
+            unbindService(serviceConnection);
 
         // step monitor stop
         /*stopStepMonitor();
@@ -158,11 +198,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
         public void onServiceConnected(ComponentName name, IBinder service) {
             myService = ((MyService.ServiceBinder)service).getService();
             isBound = true;
+            updateBtn();
         }
         @Override
         // 서비스와 연결이 해제되면
         public void onServiceDisconnected(ComponentName name) {
             isBound = false;
+            updateBtn();
         }
     };
 
@@ -173,17 +215,14 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if(event.getAction() == MotionEvent.ACTION_DOWN)
-                myService.startStepMonitor();
-
-            return false;
+        return false;
     }
 
     public void readUpdateLog() {
         logListAdaptor.clear();
-        summaryStepText.setText("Steps : " + LocationInfo.totalStepCount);
-        totalStepTimeText.setText("Moving Time : " + LocationInfo.totalMovingTime+"분");
-        maximumLocationText.setText("Top Place : " + MainActivity.locationInfo.locationName);
+        summaryStepText.setText("Steps : " + locationInfo.totalStepCount);
+        totalStepTimeText.setText("Moving Time : " + locationInfo.totalMovingTime+"분");
+        maximumLocationText.setText("Top Place : " + locationInfo.locationName);
             try {
                 String buffer = "";
                 FileInputStream file = new FileInputStream(logPath);
@@ -191,12 +230,16 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 while ((buffer = bufferedReader.readLine()) != null) {
                     logListAdaptor.add(buffer);
                 }
+
                 file = new FileInputStream(logSummaryPath);
                 bufferedReader = new BufferedReader(new InputStreamReader(file));
-                totalStepTimeText.setText("Moving Time : " + bufferedReader.readLine()+"분");
-                summaryStepText.setText("Steps : " + bufferedReader.readLine());
-                maximumLocationText.setText("Top Place : " + bufferedReader.readLine());
+                String minute = bufferedReader.readLine();
 
+                if(minute != null) {
+                    totalStepTimeText.setText("Moving Time : " + minute + "분");
+                    summaryStepText.setText("Steps : " + bufferedReader.readLine());
+                    maximumLocationText.setText("Top Place : " + bufferedReader.readLine());
+                }
             } catch (Exception e) {
             e.printStackTrace();
         }

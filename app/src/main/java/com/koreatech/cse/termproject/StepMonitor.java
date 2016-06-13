@@ -40,8 +40,8 @@ public class StepMonitor extends Service implements SensorEventListener {
     long timeDifference = 65000000;     // ns = 65ms = 1000ms
     ArrayList<Double> RMS = new ArrayList<>();  // RMS 리스트
 
-    private static final int MINUTE_PER_MAXIMUN_STEP = 20; //20
-    private static final int ONE_MINUTE_COUNT = 950; ///800
+    private static final int MINUTE_PER_MAXIMUN_STEP = 25; //25
+    private static final int ONE_MINUTE_COUNT = 950; ///950
     private static final int STOP_COUNT_FIVE = 5;
     int stopCount = 0;
     private int minute_count=0;
@@ -106,11 +106,9 @@ public class StepMonitor extends Service implements SensorEventListener {
             timeSum += (curPickTime - prevPickTime) / 1000000;
             prevPickTime = curPickTime;
             //Log.d("a", "" + minute_count + "" + stopCount + " " + isMoving);
-
             if(stopCount>STOP_COUNT_FIVE)
             {
-
-                if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>0)
+                if(steps < MINUTE_PER_MAXIMUN_STEP&& steps>1)
                 {
                     stopCount = 0;
                     intent.putExtra("isMoving", false);
@@ -118,11 +116,12 @@ public class StepMonitor extends Service implements SensorEventListener {
                     intent.putExtra("currentDate", currentDate.getTime());
                     intent.putExtra("continue_moving", false);
                     sendBroadcast(intent);
+                    currentDate = new Date();
                 }
             }
-            if(minute_count>(ONE_MINUTE_COUNT/3)||minute_count>(ONE_MINUTE_COUNT/3*2))
+            if(minute_count>(ONE_MINUTE_COUNT/3))
             {
-                if(steps < 5 && isMoving==true)
+                if(steps < 3 && isMoving==true)
                 {
                     intent.putExtra("currentDate", currentDate.getTime());
                     intent.putExtra("continue_moving", false);
@@ -135,21 +134,23 @@ public class StepMonitor extends Service implements SensorEventListener {
                     stopCount = 0;
                 }
             }
-
+            if(stopCount ==0 && minute_count==0&&isMoving==false)
+            {
+                currentDate = new Date();
+            }
             if(minute_count>ONE_MINUTE_COUNT) {
                 Log.d("a", "" + stopCount + " " + isMoving);
                 totalStepCount += steps;
                 if (steps > MINUTE_PER_MAXIMUN_STEP && isMoving==false ) {
-                    currentDate = new Date();
+                    if(stopCount>0)
+                    {
+                        currentDate = new Date();
+                    }
                     isMoving = true;
                     stopCount = 0;
                     Toast.makeText(getApplication(), "이동시작", Toast.LENGTH_SHORT).show();
                 }
                 else if(steps < MINUTE_PER_MAXIMUN_STEP && isMoving==false) {
-                    if (stopCount == 0)
-                    {
-                        currentDate = new Date();
-                    }
                     Toast.makeText(getApplication(), "정지상태", Toast.LENGTH_SHORT).show();
                     totalStepCount = 0;
                     stopCount++;
