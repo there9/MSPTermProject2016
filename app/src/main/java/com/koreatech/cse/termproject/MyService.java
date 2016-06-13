@@ -1,4 +1,4 @@
-package com.koreatech.cse.termproject;
+﻿package com.koreatech.cse.termproject;
 
 import android.Manifest;
 import android.app.AlarmManager;
