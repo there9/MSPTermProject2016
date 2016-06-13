@@ -329,8 +329,9 @@ public class MyService extends Service {
             if (isMoving == true || isContinueMoving == true) {
                 MainActivity.locationInfo.totalSumMovingTime(distantTime);
             }
+	    if (isMoving == false && isContinueMoving == false) {
             MainActivity.locationInfo.timeCompare(distantTime, indoorLocationName);
-
+	    }
             try {
                 logSummaryWriter = new PrintWriter(new BufferedWriter(new FileWriter(logSummaryPath, false)));
 
