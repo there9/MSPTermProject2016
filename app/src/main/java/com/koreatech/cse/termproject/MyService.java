@@ -50,7 +50,7 @@ public class MyService extends Service {
 
     // GPS 관련
     private long gpsStartTime;
-    private final int GPS_WAIT_MILLIS = 8000;
+    private final int GPS_WAIT_MILLIS = 10000;
 
     // 정해진 위치 정보
     private Location sportGroundLocation;
